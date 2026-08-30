@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+.step-hidden { 
+  display: none; 
+}
+
+.spinner { 
+  border: 4px solid rgba(0, 0, 0, 0.1); 
+  width: 36px; 
+  height: 36px; 
+  border-radius: 50%; 
+  border-left-color: #09f; 
+  animation: spin 1s linear infinite; 
+}
+
+@keyframes spin { 
+  0% { transform: rotate(0deg); } 
+  100% { transform: rotate(360deg); } 
+}
+
+/* Print styling for official Kartu Ujian */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  header, nav, footer, button, .print\\:hidden {
+    display: none !important;
+  }
+
+  #printable-exam-card {
+    border: 2px solid #000 !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+  }
+}

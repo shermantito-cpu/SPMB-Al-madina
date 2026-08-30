@@ -1,0 +1,26 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "description": "Stores user profiles and their registration history",
+      "rules": [
+        {
+          "allow": "read, write",
+          "condition": "request.auth != null && request.auth.uid == documentId"
+        }
+      ],
+      "subcollections": [
+        {
+          "name": "registrations",
+          "description": "Stores the user's SPMB registrations",
+          "rules": [
+            {
+              "allow": "read, write",
+              "condition": "request.auth != null && request.auth.uid == parentDocumentId"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

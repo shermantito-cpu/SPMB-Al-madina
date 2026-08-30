@@ -1,0 +1,7 @@
+{
+  "name": "SPMB Pondok Pesantren Al-Madina",
+  "description": "Sistem Penerimaan Murid Baru (SPMB) 2027/2028 Pondok Pesantren Al-Madina Prabumulih terintegrasi Google Spreadsheet dan Cetak Kartu Ujian.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

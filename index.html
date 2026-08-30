@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#059669" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>SPMB Pondok Pesantren Al-Madina 2027/2028 - Prabumulih</title>
+    <meta name="description" content="Sistem Penerimaan Murid Baru (SPMB) Pondok Pesantren Al-Madina Prabumulih Tahun Ajaran 2027/2028. Pendaftaran online terhubung Google Spreadsheet." />
+    <meta property="og:title" content="SPMB Pondok Pesantren Al-Madina 2027/2028" />
+    <meta property="og:description" content="Penerimaan Santri Baru Pondok Pesantren Al-Madina Prabumulih. Cetak Kartu Ujian & Cek Status Terintegrasi." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Amiri:wght@700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-50 antialiased font-sans text-slate-800">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>
+
