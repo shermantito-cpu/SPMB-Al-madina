@@ -123,6 +123,16 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
   const [checkLoading, setCheckLoading] = useState(false);
   const [checkMessage, setCheckMessage] = useState('');
   const [showDuplicateError, setShowDuplicateError] = useState(false);
+  const [showNextStepsPopup, setShowNextStepsPopup] = useState(false);
+
+  useEffect(() => {
+    if (isSubmitted && !isVerified && !isCheckingFormVisible) {
+      const timer = setTimeout(() => {
+        setShowNextStepsPopup(true);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSubmitted, isVerified, isCheckingFormVisible]);
 
   const formDataRef = React.useRef(formData);
   formDataRef.current = formData;
@@ -828,6 +838,58 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
 
           </div>
         )}
+
+      {/* Next Steps Popup (Shown after 6 seconds while waiting for verification) */}
+      {showNextStepsPopup && !isVerified && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-300 px-4">
+          <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl flex flex-col max-w-md w-full relative">
+            <button 
+              onClick={() => setShowNextStepsPopup(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <CheckCircle size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 leading-tight">3 Langkah Penting Setelah Pendaftaran Terverifikasi</h3>
+            </div>
+            
+            <div className="space-y-4 mb-8">
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-0.5">1</div>
+                <div>
+                  <p className="font-semibold text-gray-800">Download Lembar Peserta Tes</p>
+                  <p className="text-sm text-gray-500">Akan tersedia di halaman ini setelah diverifikasi.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-0.5">2</div>
+                <div>
+                  <p className="font-semibold text-gray-800">Download Berkas Persyaratan</p>
+                  <p className="text-sm text-gray-500">Termasuk Surat Pernyataan dan dokumen lain.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-0.5">3</div>
+                <div>
+                  <p className="font-semibold text-gray-800">Bergabung Ke Grup Whatsapp</p>
+                  <p className="text-sm text-gray-500">Untuk mendapatkan info terbaru SPMB Al-Madina.</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowNextStepsPopup(false)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-md"
+            >
+              Mengerti & Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
       </div>
     );
   }
@@ -966,7 +1028,22 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Pekerjaan Utama *</label>
-                    <input required type="text" name="pekerjaanUtama" value={formData.pekerjaanUtama} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Contoh: PNS, Wiraswasta" />
+                    <select required name="pekerjaanUtama" value={formData.pekerjaanUtama} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                      <option value="" disabled>Pilih pekerjaan...</option>
+                      <option value="PNS/ASN">PNS/ASN</option>
+                      <option value="TNI">TNI</option>
+                      <option value="Polri">Polri</option>
+                      <option value="Pegawai BUMN / BUMD">Pegawai BUMN / BUMD</option>
+                      <option value="Pejabat Negara">Pejabat Negara</option>
+                      <option value="Karyawan Swasta">Karyawan Swasta</option>
+                      <option value="Guru / Dosen">Guru / Dosen</option>
+                      <option value="Dokter / Bidan / Perawat">Dokter / Bidan / Perawat</option>
+                      <option value="Wiraswasta / Pengusaha">Wiraswasta / Pengusaha</option>
+                      <option value="Pedagang">Pedagang</option>
+                      <option value="Petani">Petani</option>
+                      <option value="Buruh">Buruh</option>
+                      <option value="Sopir">Sopir</option>
+                    </select>
                   </div>
                 </div>
                 

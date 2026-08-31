@@ -13,6 +13,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [verifyingUser, setVerifyingUser] = useState<any>(null);
   const [chartPeriod, setChartPeriod] = useState('Keseluruhan'); // 'Harian', 'Pekanan', 'Keseluruhan'
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -399,9 +400,12 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                       <td className="px-6 py-4">{row.jenjang || row.jenjangName || '-'}</td>
                       <td className="px-6 py-4">
                         {row.buktiPembayaranBase64 ? (
-                          <a href={row.buktiPembayaranBase64} target="_blank" rel="noreferrer" className="text-emerald-600 font-semibold hover:underline text-xs flex items-center gap-1">
+                          <button 
+                            onClick={() => setSelectedImage(row.buktiPembayaranBase64)}
+                            className="text-emerald-600 font-semibold hover:underline text-xs flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                          >
                             <FileText size={14} /> Lihat
-                          </a>
+                          </button>
                         ) : (
                           <span className="text-slate-400 text-xs">Tidak ada</span>
                         )}
@@ -536,6 +540,25 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
             >
               Batal
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedImage(null)}>
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setSelectedImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors bg-black/50 rounded-full p-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <img 
+              src={selectedImage} 
+              alt="Bukti Pembayaran" 
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl bg-white"
+            />
           </div>
         </div>
       )}
