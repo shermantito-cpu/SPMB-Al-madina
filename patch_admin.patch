@@ -1,0 +1,51 @@
+--- src/pages/AdminDashboard.tsx
++++ src/pages/AdminDashboard.tsx
+@@ -4,3 +4,3 @@
+ import { db } from '../lib/firebase';
+-import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
++import { collection, getDocs, doc, updateDoc, query, orderBy, onSnapshot, setDoc } from 'firebase/firestore';
+ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+@@ -14,2 +14,3 @@
+   const [chartPeriod, setChartPeriod] = useState('Keseluruhan'); // 'Harian', 'Pekanan', 'Keseluruhan'
++  const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
+   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+@@ -17,2 +18,14 @@
+ 
++  useEffect(() => {
++    const unsub = onSnapshot(doc(db, 'settings', 'registrationControl'), (docSnap) => {
++      if (docSnap.exists()) {
++        setIsWusthoUlyaOpen(docSnap.data().wusthoUlyaOpen !== false);
++      } else {
++        setIsWusthoUlyaOpen(true);
++      }
++    }, (err) => {
++      console.error("Failed to fetch settings", err);
++    });
++    return () => unsub();
++  }, []);
++
++  const togglePortal = async () => {
++    try {
++      const ref = doc(db, 'settings', 'registrationControl');
++      await setDoc(ref, { wusthoUlyaOpen: !isWusthoUlyaOpen }, { merge: true });
++    } catch (e) {
++      console.error('Error toggling portal', e);
++      alert('Gagal merubah status portal');
++    }
++  };
++
+   const fetchData = async () => {
+@@ -242,2 +267,13 @@
+ 
++        {/* Control Panel */}
++        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
++          <div>
++            <h2 className="font-bold text-slate-800 text-lg">Kontrol Portal Pendaftaran</h2>
++            <p className="text-sm text-slate-500">Buka/Tutup pendaftaran khusus jenjang Salafiyah Wustho (SMP) & Salafiyah Ulya (SMA).</p>
++          </div>
++          <button onClick={togglePortal} className={`px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${isWusthoUlyaOpen ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}>
++            {isWusthoUlyaOpen ? 'Tutup Pendaftaran Wustho/Ulya' : 'Buka Pendaftaran Wustho/Ulya'}
++          </button>
++        </div>
++
+         {error && (

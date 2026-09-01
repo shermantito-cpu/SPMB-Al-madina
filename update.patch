@@ -1,0 +1,53 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -6,2 +6,3 @@
+ import { useAuth } from './contexts/AuthContext';
+-import { collection, query, where, getDocs } from 'firebase/firestore';
++import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
+ import { db } from './lib/firebase';
+@@ -27,2 +28,3 @@
+   const [showClosedNotif, setShowClosedNotif] = useState(false);
++  const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
+   const { currentUser, logout } = useAuth();
+@@ -74,2 +76,14 @@
+ 
++  useEffect(() => {
++    const unsub = onSnapshot(doc(db, 'settings', 'registrationControl'), (docSnap) => {
++      if (docSnap.exists()) {
++        setIsWusthoUlyaOpen(docSnap.data().wusthoUlyaOpen !== false); // default true if undefined
++      } else {
++        setIsWusthoUlyaOpen(true);
++      }
++    }, (err) => {
++      console.error("Failed to fetch settings", err);
++    });
++    return () => unsub();
++  }, []);
++
+   useEffect(() => {
+@@ -106,2 +120,6 @@
+     }
++    if ((jenjang === 'Wustho' || jenjang === 'Ulya') && !isWusthoUlyaOpen) {
++      setShowClosedNotif(true);
++      return;
++    }
+     navigateTo('home', jenjang);
+@@ -395,4 +413,15 @@
+             <h3 className="text-xl font-bold text-gray-800 mb-2">Informasi</h3>
+-            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+-              Mohon Maaf, Pendaftaran untuk jenjang ini belum dibuka.
+-            </p>
++            {!isWusthoUlyaOpen ? (
++              <div className="text-sm text-gray-600 mb-6 leading-relaxed text-left">
++                <p className="font-bold text-center mb-2">📣 SEGERA DIBUKA!</p>
++                <p className="text-center font-semibold mb-4">SPMB (Sistem Penerimaan Murid Baru)</p>
++                <p className="mb-2">✨ Gelombang Pertama:<br/>📅 09 September 2026</p>
++                <p>📌 Yuk, persiapkan segera dan jangan sampai ketinggalan pendaftaran gelombang pertama!</p>
++              </div>
++            ) : (
++              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
++                Mohon Maaf, Pendaftaran untuk jenjang ini belum dibuka.
++              </p>
++            )}
++
+             <button 

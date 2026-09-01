@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Home, Download, ArrowLeft, Users, CreditCard, Banknote, Filter, RefreshCw, CheckCircle, FileText, Check, Clock, PenTool } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, orderBy, onSnapshot, setDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () => void, onGoHome: () => void }) {
@@ -13,7 +13,31 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [verifyingUser, setVerifyingUser] = useState<any>(null);
   const [chartPeriod, setChartPeriod] = useState('Keseluruhan'); // 'Harian', 'Pekanan', 'Keseluruhan'
+  const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'registrationControl'), (docSnap) => {
+      if (docSnap.exists()) {
+        setIsWusthoUlyaOpen(docSnap.data().wusthoUlyaOpen !== false);
+      } else {
+        setIsWusthoUlyaOpen(true);
+      }
+    }, (err) => {
+      console.error("Failed to fetch settings", err);
+    });
+    return () => unsub();
+  }, []);
+
+  const togglePortal = async () => {
+    try {
+      const ref = doc(db, 'settings', 'registrationControl');
+      await setDoc(ref, { wusthoUlyaOpen: !isWusthoUlyaOpen }, { merge: true });
+    } catch (e) {
+      console.error('Error toggling portal', e);
+      alert('Gagal merubah status portal');
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -242,6 +266,20 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         
+        {/* Control Panel */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="font-bold text-slate-800 text-lg">Kontrol Portal Pendaftaran</h2>
+            <p className="text-sm text-slate-500">SPMB Ponpes Al-Madina Prabumulih</p>
+          </div>
+          <button 
+            onClick={togglePortal} 
+            className={`px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${isWusthoUlyaOpen ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+          >
+            {isWusthoUlyaOpen ? 'Tutup Pendaftaran Wustho/Ulya/Mahad Aly' : 'Buka Pendaftaran Wustho/Ulya/Mahad Aly'}
+          </button>
+        </div>
+
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6 flex items-center">
             <span className="font-semibold">{error}</span>
@@ -368,8 +406,8 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
         </div>
 
         {/* Menunggu Verifikasi */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mb-8">
-          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-yellow-50/50">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 mb-8">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-yellow-50/50 rounded-t-[1.5rem]">
             <h3 className="text-lg font-bold text-yellow-800 flex items-center gap-2">
               <Clock size={20} /> Menunggu Verifikasi ({pendingData.length})
             </h3>
@@ -427,8 +465,8 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
         </div>
 
         {/* Tabel Data Terverifikasi */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-[1.5rem]">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <CheckCircle size={20} className="text-emerald-500" /> Pendaftar Terverifikasi
             </h3>
@@ -441,7 +479,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
               </button>
               
               {showDownloadMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 bottom-full mb-2 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-[60] overflow-hidden">
                   <div className="px-3 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b border-slate-100">
                     Pilih Jenjang:
                   </div>

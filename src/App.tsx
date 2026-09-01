@@ -5,7 +5,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import { useAuth } from './contexts/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { 
   FileText, 
@@ -26,6 +26,7 @@ export default function App() {
   const [selectedJenjang, setSelectedJenjang] = useState<string | null>(null);
   const [view, setView] = useState<'home' | 'login' | 'register' | 'dashboard' | 'admin_dashboard'>('home');
   const [showClosedNotif, setShowClosedNotif] = useState(false);
+  const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
   const { currentUser, logout } = useAuth();
 
   const [printRegNumber, setPrintRegNumber] = useState<string | null>(null);
@@ -74,6 +75,19 @@ export default function App() {
   
 
   useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'registrationControl'), (docSnap) => {
+      if (docSnap.exists()) {
+        setIsWusthoUlyaOpen(docSnap.data().wusthoUlyaOpen !== false);
+      } else {
+        setIsWusthoUlyaOpen(true);
+      }
+    }, (err) => {
+      console.error("Failed to fetch settings", err);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     // Sync initial state to history on mount
     window.history.replaceState({ view: 'home', selectedJenjang: null, printRegNumber: null }, '', '');
 
@@ -103,6 +117,10 @@ export default function App() {
 
   const handleSelectJenjang = (jenjang: string) => {
     if (jenjang === 'RA' || jenjang === 'Ula') {
+      setShowClosedNotif(true);
+      return;
+    }
+    if ((jenjang === 'Wustho' || jenjang === 'Ulya' || jenjang === 'Mahad_Aly') && !isWusthoUlyaOpen) {
       setShowClosedNotif(true);
       return;
     }
@@ -394,9 +412,18 @@ export default function App() {
               <span className="text-3xl font-bold">!</span>
             </div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Informasi</h3>
-            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-              Mohon Maaf, Pendaftaran untuk jenjang ini belum dibuka.
-            </p>
+            {!isWusthoUlyaOpen ? (
+              <div className="text-sm text-gray-600 mb-6 leading-relaxed text-left bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <p className="font-bold text-center mb-2 text-emerald-600">📣 SEGERA DIBUKA!</p>
+                <p className="text-center font-bold mb-4 text-gray-800">SPMB (Sistem Penerimaan Murid Baru)</p>
+                <p className="mb-2">✨ Gelombang Pertama:<br/>📅 09 September 2026</p>
+                <p>📌 Yuk, persiapkan segera dan jangan sampai ketinggalan pendaftaran gelombang pertama!</p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                Mohon Maaf, Pendaftaran untuk jenjang ini belum dibuka.
+              </p>
+            )}
             <button 
               onClick={() => setShowClosedNotif(false)}
               className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl transition-colors"
