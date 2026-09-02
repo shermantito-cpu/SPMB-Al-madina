@@ -582,7 +582,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
         </div>
       )}
 
-      {/* Image Modal */}
+      {/* File/Image Modal */}
       {selectedImage && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedImage(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
@@ -592,11 +592,28 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
-            <img 
-              src={selectedImage} 
-              alt="Bukti Pembayaran" 
-              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl bg-white"
-            />
+            {selectedImage.startsWith('data:application/pdf') ? (
+              <div className="w-full h-[85vh] bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden">
+                <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+                  <span className="text-sm font-semibold text-slate-700">Pratinjau Dokumen PDF</span>
+                  <a href={selectedImage} download="Bukti_Pembayaran.pdf" className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 shadow-sm transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Unduh File Asli
+                  </a>
+                </div>
+                <iframe 
+                  src={selectedImage} 
+                  className="flex-1 w-full bg-slate-50"
+                  title="Pratinjau PDF"
+                />
+              </div>
+            ) : (
+              <img 
+                src={selectedImage} 
+                alt="Bukti Pembayaran" 
+                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl bg-white"
+              />
+            )}
           </div>
         </div>
       )}
