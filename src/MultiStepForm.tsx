@@ -881,9 +881,9 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
                 <Download size={20} />
                 Download Lembar Peserta Tes
               </button>
-              <a href="https://drive.google.com/drive/folders/14tCcnxErz4fzf3OfptIAw1Oc4zeV_ooN?usp=sharing" target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl text-center shadow-md transition-colors flex items-center justify-center gap-2">
+              <a href="https://drive.google.com/file/d/1XAXKV3w0kqtLpWqpBc7lLI-uAWyxYfLt/view" target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl text-center shadow-md transition-colors flex items-center justify-center gap-2">
                 <Download size={20} />
-                Download Berkas Administrasi (Dibawa tes)
+                Download Surat Pernyataan (Dibawa saat tes)
               </a>
               {jenjang === 'Wustho' && (
                 <a href="https://chat.whatsapp.com/Lbk3izpCAbE7k8vErvWdbY" target="_blank" rel="noopener noreferrer" className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl text-center shadow-md transition-colors flex items-center justify-center gap-2">
