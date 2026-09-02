@@ -131,6 +131,15 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
     setTimeout(() => setToastNotif(null), 4000);
   };
 
+  const actionButtonsRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isVerified && actionButtonsRef.current) {
+      setTimeout(() => {
+        actionButtonsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 500);
+    }
+  }, [isVerified]);
 
   useEffect(() => {
     if (isSubmitted && !isVerified && !isCheckingFormVisible) {
@@ -839,14 +848,14 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
             </div>
 
             {/* Action Buttons Below Exam Card (Only Visible if Verified) */}
-            <div className="max-w-4xl mx-auto mt-6 flex flex-col gap-3 print:hidden px-4">
+            <div ref={actionButtonsRef} className="max-w-4xl mx-auto mt-6 flex flex-col gap-3 print:hidden px-4">
               <button onClick={handlePrint} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl text-center shadow-md transition-colors flex items-center justify-center gap-2">
                 <Download size={20} />
                 Download Lembar Peserta Tes
               </button>
               <a href="https://drive.google.com/file/d/1XAXKV3w0kqtLpWqpBc7lLI-uAWyxYfLt/view" target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl text-center shadow-md transition-colors flex items-center justify-center gap-2">
                 <Download size={20} />
-                Download Surat Pernyataan
+                Download Berkas Administrasi (Dibawa tes)
               </a>
               {jenjang === 'Wustho' && (
                 <a href="https://chat.whatsapp.com/Lbk3izpCAbE7k8vErvWdbY" target="_blank" rel="noopener noreferrer" className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl text-center shadow-md transition-colors flex items-center justify-center gap-2">
