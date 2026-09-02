@@ -395,11 +395,39 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
     return valid;
   };
 
-  const handleNextSubmit = (e: React.FormEvent) => {
+  const handleNextSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateStep()) {
-      setStep(prev => prev + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setIsSubmitting(true);
+      try {
+        if (step === 1 && formData.nik) {
+          const qNik = query(collection(db, 'public_registrations'), where('nik', '==', formData.nik));
+          const snapNik = await getDocs(qNik);
+          if (!snapNik.empty) {
+            showToast('NIK ini sudah terdaftar sebelumnya. Pendaftaran ganda tidak diizinkan.', 'error');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+        
+        if (step === 2 && formData.nisn) {
+          const qNisn = query(collection(db, 'public_registrations'), where('nisn', '==', formData.nisn));
+          const snapNisn = await getDocs(qNisn);
+          if (!snapNisn.empty) {
+            showToast('NISN ini sudah terdaftar sebelumnya. Pendaftaran ganda tidak diizinkan.', 'error');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+        
+        setStep(prev => prev + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (error) {
+        console.error('Error checking duplicate:', error);
+        showToast('Terjadi kesalahan saat memeriksa data. Silakan coba lagi.', 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
