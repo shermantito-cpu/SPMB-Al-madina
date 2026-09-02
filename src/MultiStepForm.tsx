@@ -125,6 +125,13 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
   const [showDuplicateError, setShowDuplicateError] = useState(false);
   const [showNextStepsPopup, setShowNextStepsPopup] = useState(false);
 
+  const [toastNotif, setToastNotif] = useState<{message: string, type: 'error' | 'success'} | null>(null);
+  const showToast = (message: string, type: 'error' | 'success' = 'error') => {
+    setToastNotif({ message, type });
+    setTimeout(() => setToastNotif(null), 4000);
+  };
+
+
   useEffect(() => {
     if (isSubmitted && !isVerified && !isCheckingFormVisible) {
       const timer = setTimeout(() => {
@@ -344,7 +351,13 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData(prev => ({ ...prev, buktiPembayaran: e.target.files![0] }));
+      const file = e.target.files[0];
+      if (file.size > 2 * 1024 * 1024) {
+        showToast('Ukuran file terlalu besar! Maksimal 2MB.', 'error');
+        e.target.value = '';
+        return;
+      }
+      setFormData(prev => ({ ...prev, buktiPembayaran: file }));
     }
   };
 
@@ -391,6 +404,11 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (event) => {
+        if (file.type === 'application/pdf') {
+          resolve(event.target?.result as string);
+          return;
+        }
+        
         const img = new Image();
         img.src = event.target?.result as string;
         img.onload = () => {
@@ -425,6 +443,12 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.metodePembayaran === 'Transfer' && !formData.buktiPembayaran) {
+      showToast('Anda memilih metode pembayaran Transfer Bank. Mohon upload bukti transfer terlebih dahulu.', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -895,7 +919,23 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans pb-12">
+    <div className="min-h-screen bg-gray-50 flex flex-col font-sans pb-12 relative">
+      {/* Toast Notification */}
+      {toastNotif && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-5 fade-in duration-300 w-[90%] max-w-md">
+          <div className={`p-4 rounded-xl shadow-lg border flex items-start gap-3 ${toastNotif.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
+            <div className="mt-0.5">
+              {toastNotif.type === 'error' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              ) : (
+                <CheckCircle size={20} />
+              )}
+            </div>
+            <p className="text-sm font-medium leading-relaxed">{toastNotif.message}</p>
+          </div>
+        </div>
+      )}
+
       {/* Header Form */}
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 h-16 flex items-center">
@@ -1164,6 +1204,16 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
                           </span>
                         )}
                       </label>
+                    </div>
+                  </div>
+                )}
+
+                {formData.metodePembayaran === 'Tunai' && (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
+                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-4">
+                      <p className="text-sm text-orange-800 font-medium leading-relaxed">
+                        <strong>Catatan:</strong> Pendaftar baru dapat mencetak lembar peserta tes setelah melakukan pembayaran tunai secara langsung di pondok pesantren.
+                      </p>
                     </div>
                   </div>
                 )}

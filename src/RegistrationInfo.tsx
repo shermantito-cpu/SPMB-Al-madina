@@ -333,6 +333,14 @@ export default function RegistrationInfo({ jenjang, onBack, printRegNumber }: Re
                       </div>
                     </>
                   )}
+                  
+                  <div className="mt-6 pt-4 border-t border-gray-100 bg-red-50/50 p-4 rounded-xl border border-red-100/50">
+                    <p className="text-sm font-semibold text-red-800 mb-2">Catatan Penting:</p>
+                    <ul className="text-xs text-red-700/80 list-disc pl-4 space-y-1.5 leading-relaxed">
+                      <li>Belum termasuk uang buku</li>
+                      <li>Jika mengundurkan diri, maka berkas administrasi dan uang pangkal yang telah diserahkan tidak dapat diminta kembali</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
               <div className="p-4 border-t border-gray-100 bg-gray-50 text-center rounded-b-2xl">
