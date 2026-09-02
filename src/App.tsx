@@ -24,7 +24,16 @@ import {
 
 export default function App() {
   const [selectedJenjang, setSelectedJenjang] = useState<string | null>(null);
-  const [view, setView] = useState<'home' | 'login' | 'register' | 'dashboard' | 'admin_dashboard'>('home');
+  const [view, setView] = useState<'home' | 'login' | 'register' | 'dashboard' | 'admin_dashboard'>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isAdminRoute = window.location.pathname === '/admin' || urlParams.get('admin') === 'true' || window.location.hash === '#admin';
+      if (isAdminRoute) {
+        return localStorage.getItem('isAdminLoggedIn') === 'true' ? 'admin_dashboard' : 'login';
+      }
+    }
+    return 'home';
+  });
   const [showClosedNotif, setShowClosedNotif] = useState(false);
   const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
   const { currentUser, logout } = useAuth();
@@ -88,8 +97,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Sync initial state to history on mount
-    window.history.replaceState({ view: 'home', selectedJenjang: null, printRegNumber: null }, '', '');
+    // Cek rute rahasia untuk Admin
+    const urlParams = new URLSearchParams(window.location.search);
+    const isAdminRoute = window.location.pathname === '/admin' || urlParams.get('admin') === 'true' || window.location.hash === '#admin';
+    
+    if (isAdminRoute) {
+      if (localStorage.getItem('isAdminLoggedIn') === 'true') {
+        setView('admin_dashboard');
+        window.history.replaceState({ view: 'admin_dashboard', selectedJenjang: null, printRegNumber: null }, '', '/');
+      } else {
+        setView('login');
+        window.history.replaceState({ view: 'login', selectedJenjang: null, printRegNumber: null }, '', '/');
+      }
+    } else {
+      // Sync initial state to history on mount
+      window.history.replaceState({ view: 'home', selectedJenjang: null, printRegNumber: null }, '', '');
+    }
 
     const handlePopState = (event: PopStateEvent) => {
       if (event.state) {
@@ -154,7 +177,15 @@ export default function App() {
             <img 
               src="/logp.png" 
               alt="Logo Al-Madina" 
-              className="w-12 h-12 md:w-14 md:h-14 object-contain"
+              className="w-12 h-12 md:w-14 md:h-14 object-contain cursor-pointer"
+              title="Portal SPMB"
+              onDoubleClick={() => {
+                if (localStorage.getItem('isAdminLoggedIn') === 'true') {
+                  navigateTo('admin_dashboard');
+                } else {
+                  navigateTo('login');
+                }
+              }}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
@@ -186,21 +217,7 @@ export default function App() {
                   <span className="hidden sm:inline">Keluar</span>
                 </button>
               </div>
-            ) : (
-              <button 
-                onClick={() => {
-                  if (localStorage.getItem('isAdminLoggedIn') === 'true') {
-                    navigateTo('admin_dashboard');
-                  } else {
-                    navigateTo('login');
-                  }
-                }}
-                className="flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-100 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full transition-colors shadow-sm"
-              >
-                <Shield size={14} className="hidden sm:block text-emerald-600" />
-                <span>Login Admin</span>
-              </button>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
