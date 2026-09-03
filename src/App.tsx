@@ -341,7 +341,10 @@ export default function App() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 justify-center">
             
-            {/* Jenjang 1: RA */}
+            {/* 
+              TOMBOL JENJANG RA & ULA SEMENTARA DI-HIDDEN / DIKOMENTAR 
+              (Sesuai permintaan)
+              
             <div className="group flex flex-col items-center text-center bg-white p-8 rounded-2xl shadow-sm border border-gray-200 hover:border-emerald-500 hover:shadow-md transition-all duration-300">
               <div className="w-24 h-24 mb-6 group-hover:scale-110 transition-transform duration-300">
                 <img src="/TK.jpg" alt="Logo RA" className="w-full h-full object-contain rounded-full shadow-sm" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
@@ -355,7 +358,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Jenjang 2: Ula */}
             <div className="group flex flex-col items-center text-center bg-white p-8 rounded-2xl shadow-sm border border-gray-200 hover:border-emerald-500 hover:shadow-md transition-all duration-300">
               <div className="w-24 h-24 mb-6 group-hover:scale-110 transition-transform duration-300">
                 <img src="/ULA.jpg" alt="Logo Ula" className="w-full h-full object-contain rounded-full shadow-sm" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
@@ -368,6 +370,7 @@ export default function App() {
                 Daftar
               </button>
             </div>
+            */}
 
             {/* Jenjang 3: Wustho */}
             <div className="group flex flex-col items-center text-center bg-white p-8 rounded-2xl shadow-sm border border-gray-200 hover:border-emerald-500 hover:shadow-md transition-all duration-300">

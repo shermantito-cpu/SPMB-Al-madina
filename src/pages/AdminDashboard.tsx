@@ -161,6 +161,42 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
   
   const chartData = getChartData();
 
+  const getAsalSekolahChartData = () => {
+    // 1. Filter data only for Wustho and Ulya
+    const wusthoUlyaData = data.filter(d => {
+      const j = (d.jenjangName || d.jenjang || '').toLowerCase();
+      return j.includes('wustho') || j.includes('ulya');
+    });
+
+    // 2. Group by asalSekolah
+    const schools: Record<string, { name: string, wustho: number, ulya: number, total: number }> = {};
+
+    wusthoUlyaData.forEach(d => {
+      let sekolah = (d.asalSekolah || d.asal_sekolah || '-').trim();
+      if (!sekolah || sekolah === '-') sekolah = 'Tidak Diketahui';
+      
+      const j = (d.jenjangName || d.jenjang || '').toLowerCase();
+      
+      if (!schools[sekolah]) {
+        schools[sekolah] = { name: sekolah, wustho: 0, ulya: 0, total: 0 };
+      }
+
+      if (j.includes('wustho')) {
+        schools[sekolah].wustho += 1;
+      } else if (j.includes('ulya')) {
+        schools[sekolah].ulya += 1;
+      }
+      schools[sekolah].total += 1;
+    });
+
+    // 3. Convert to array and sort by total descending, take top 10
+    return Object.values(schools)
+      .filter(s => s.name !== 'Tidak Diketahui')
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+  };
+
+  const asalSekolahChartData = getAsalSekolahChartData();
 
   const handleExportExcel = (jenjangToExport: string) => {
     let dataToExport = data.filter(d => (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi'));
@@ -373,6 +409,46 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                 <Bar dataKey="total" fill="#10b981" radius={[6, 6, 0, 0]} name="Total Pendaftar" barSize={40} />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Grafik Asal Sekolah */}
+        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-8">
+          <div className="mb-6">
+            <h3 className="text-xl font-bold text-slate-800">Top 10 Asal Sekolah (Wustho & Ulya)</h3>
+            <p className="text-sm text-slate-500">Berdasarkan pendaftar jenjang Salafiyah Wustho dan Salafiyah Ulya</p>
+          </div>
+          
+          <div className="h-72 sm:h-96 w-full mt-4">
+            {asalSekolahChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={asalSekolahChartData} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#64748b', fontSize: 11}} 
+                    dy={10} 
+                    angle={-45} 
+                    textAnchor="end" 
+                    height={80} 
+                  />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} allowDecimals={false} />
+                  <Tooltip 
+                    cursor={{fill: '#f1f5f9'}}
+                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'}}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                  <Bar dataKey="wustho" name="Salafiyah Wustho" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="ulya" name="Salafiyah Ulya" stackId="a" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-400 font-medium">
+                Belum ada data pendaftar dari sekolah asal
+              </div>
+            )}
           </div>
         </div>
 
