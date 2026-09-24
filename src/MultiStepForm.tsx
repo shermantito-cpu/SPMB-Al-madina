@@ -56,6 +56,18 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
   const [nomorPeserta, setNomorPeserta] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSchoolSuggestions, setShowSchoolSuggestions] = useState(false);
+  
+  const SCHOOL_SUGGESTIONS = [
+    "SD IT AL ISTIQOMAH Prabumulih",
+    "SMP IT AL ISTIQOMAH Prabumulih",
+    "PPS Zaadul Ma'ad Palembang",
+    "PPTQ AL-IZZAH PALEMBANG",
+    "SMP Islam Faza Palembang",
+    "SD Islam Faza Palembang",
+    "PPTQ Mutiara Sunnah Palembang",
+    "Ponpes Darussalam Tanjung Telang"
+  ];
 
   // Real-time listener for registration status
   React.useEffect(() => {
@@ -1065,7 +1077,44 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
                 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Asal Sekolah *</label>
-                  <input required type="text" name="asalSekolah" value={formData.asalSekolah} onChange={handleChange} className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Nama instansi pendidikan sebelumnya" />
+                  <div className="relative">
+                    <input 
+                      required 
+                      type="text" 
+                      name="asalSekolah" 
+                      value={formData.asalSekolah} 
+                      onChange={(e) => {
+                        handleChange(e);
+                        setShowSchoolSuggestions(true);
+                      }} 
+                      onFocus={() => setShowSchoolSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSchoolSuggestions(false), 200)}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                      placeholder="Nama instansi pendidikan sebelumnya" 
+                    />
+                    {showSchoolSuggestions && formData.asalSekolah && (
+                      (() => {
+                        const filtered = SCHOOL_SUGGESTIONS.filter(s => s.toLowerCase().includes(formData.asalSekolah.toLowerCase()) && s !== formData.asalSekolah);
+                        if (filtered.length === 0) return null;
+                        return (
+                          <div className="absolute z-10 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
+                            {filtered.map((school, i) => (
+                              <div 
+                                key={i} 
+                                className="px-4 py-3 hover:bg-emerald-50 cursor-pointer text-sm text-gray-700 font-medium transition-colors border-b border-gray-50 last:border-0"
+                                onClick={() => {
+                                  handleChange({ target: { name: 'asalSekolah', value: school } } as any);
+                                  setShowSchoolSuggestions(false);
+                                }}
+                              >
+                                {school}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
                 </div>
                 
                 <div>

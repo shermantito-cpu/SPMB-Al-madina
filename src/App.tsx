@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import RegistrationInfo from './RegistrationInfo';
+import PromoPopup from './components/PromoPopup';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -34,6 +35,12 @@ export default function App() {
     }
     return 'home';
   });
+  const [showPromoPopup, setShowPromoPopup] = useState(true);
+
+  const handleClosePromo = () => {
+    setShowPromoPopup(false);
+  };
+
   const [showClosedNotif, setShowClosedNotif] = useState(false);
   const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
   const { currentUser, logout } = useAuth();
@@ -169,6 +176,7 @@ export default function App() {
 
   return (
     <>
+      {showPromoPopup && view === 'home' && <PromoPopup onClose={handleClosePromo} />}
       <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       {/* HEADER */}
       <header className="bg-white shadow-sm border-b border-gray-100">

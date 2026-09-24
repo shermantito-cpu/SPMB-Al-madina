@@ -146,8 +146,23 @@ export default function RegistrationInfo({ jenjang, onBack, printRegNumber }: Re
               <h3 className="text-lg font-bold text-gray-800">Biaya Pendaftaran</h3>
             </div>
             <div className="flex-1 flex flex-col justify-center items-center py-4 text-center">
-              <span className="text-gray-500 text-sm mb-1">Total Biaya Pendaftaran Formulir</span>
-              <span className="text-4xl font-extrabold text-emerald-600 tracking-tight">{details.price}</span>
+              {jenjang === 'Mahad_Aly' ? (
+                <div className="flex flex-col w-full text-left bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <div className="mb-3">
+                    <span className="text-gray-600 text-sm font-medium mb-1 block">- Total Biaya Pendaftaran Formulir Ma'had Aly :</span>
+                    <span className="text-2xl font-extrabold text-emerald-600 tracking-tight">Rp 350.000</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 text-sm font-medium mb-1 block">- Total Biaya Pendaftaran Formulir Tadribud du'at :</span>
+                    <span className="text-2xl font-extrabold text-emerald-600 tracking-tight">Rp 200.000</span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className="text-gray-500 text-sm mb-1">Total Biaya Pendaftaran Formulir</span>
+                  <span className="text-4xl font-extrabold text-emerald-600 tracking-tight">{details.price}</span>
+                </>
+              )}
               <p className="text-xs text-gray-400 mt-3 max-w-xs leading-relaxed mb-4">
                 (Biaya tersebut belum termasuk biaya daftar ulang dan seragam saat dinyatakan lulus)
               </p>
@@ -199,7 +214,7 @@ export default function RegistrationInfo({ jenjang, onBack, printRegNumber }: Re
           <p className="text-gray-500 text-sm mb-4">Ingin mengetahui informasi lebih detail?</p>
           <div className="flex flex-col items-center gap-4 max-w-md mx-auto mb-8">
             <a 
-              href="https://drive.google.com/file/d/1HVFp2sfUCUghIQVPBKuWgA1PAQxQeKsW/view?usp=sharing" 
+              href={jenjang === 'Mahad_Aly' ? "https://drive.google.com/file/d/1BiQydjZXBIV-BRVMLo3STnuaFIEF_tTj/view" : "https://drive.google.com/file/d/1HVFp2sfUCUghIQVPBKuWgA1PAQxQeKsW/view?usp=sharing"} 
               target="_blank" 
               rel="noopener noreferrer"
               className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold py-3 px-8 rounded-full border border-blue-200 transition-all flex items-center justify-center text-base"

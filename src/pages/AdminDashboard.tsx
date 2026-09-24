@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Home, Download, ArrowLeft, Users, CreditCard, Banknote, Filter, RefreshCw, CheckCircle, FileText, Check, Clock, PenTool } from 'lucide-react';
+import { Home, Download, ArrowLeft, Users, CreditCard, Banknote, Filter, RefreshCw, CheckCircle, FileText, Check, Clock, PenTool, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, getDocs, doc, updateDoc, query, orderBy, onSnapshot, setDoc } from 'firebase/firestore';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 
 export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () => void, onGoHome: () => void }) {
   const [data, setData] = useState<any[]>([]);
@@ -15,6 +15,13 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
   const [chartPeriod, setChartPeriod] = useState('Keseluruhan'); // 'Harian', 'Pekanan', 'Keseluruhan'
   const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [currentPageVerified, setCurrentPageVerified] = useState(1);
+  const ITEMS_PER_PAGE = 15;
+
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setCurrentPageVerified(1);
+  }, [filterJenjang]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'registrationControl'), (docSnap) => {
@@ -116,19 +123,30 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
     return !status.includes('terverifikasi') && !status.includes('ditolak');
   });
 
-  const getCountByJenjang = (j: string) => data.filter(d => (d.jenjangName || d.jenjang || '').toLowerCase().includes(j.toLowerCase()) && (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi')).length;
+  const getCountByJenjang = (...keys: string[]) => data.filter(d => {
+    const jenjangStr = (d.jenjangName || d.jenjang || '').toLowerCase();
+    const isTerverifikasi = (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi');
+    return keys.some(key => jenjangStr.includes(key)) && isTerverifikasi;
+  }).length;
 
   // Chart Data Calculation
   const getChartData = () => {
     const now = new Date();
     
     // Helper to check if a date is within a timeframe
-    const isWithinPeriod = (dateStr: string, period: string) => {
-      if (!dateStr) return false;
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return false;
-      
+    const isWithinPeriod = (dateVal: any, period: string) => {
       if (period === 'Keseluruhan') return true;
+      if (!dateVal) return false;
+      
+      let d: Date;
+      if (typeof dateVal === 'object' && dateVal.seconds) {
+        // Handle Firestore Timestamp object
+        d = new Date(dateVal.seconds * 1000);
+      } else {
+        d = new Date(dateVal);
+      }
+      
+      if (isNaN(d.getTime())) return false;
       
       if (period === 'Harian') {
         return d.getDate() === now.getDate() && 
@@ -145,58 +163,164 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
     };
 
     // Filter by period
-    const periodData = data.filter(d => isWithinPeriod(d.createdAt, chartPeriod));
+    const periodData = data.filter(d => {
+      let dateVal = d.createdAt;
+      
+      if (!dateVal && d.tanggalDaftar) {
+        // Fallback to tanggalDaftar (format typically DD/MM/YYYY or similar)
+        // This is a naive split for common Indonesian formats
+        const parts = d.tanggalDaftar.split('/');
+        if (parts.length === 3) {
+          // Attempt parsing if DD/MM/YYYY
+          if (parts[0].length <= 2 && parts[1].length <= 2) {
+             dateVal = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`);
+          }
+        }
+      }
+      return isWithinPeriod(dateVal, chartPeriod);
+    });
     
     // Group by Jenjang
-    const getCount = (jKey: string) => periodData.filter(d => (d.jenjangName || d.jenjang || '').toLowerCase().includes(jKey)).length;
+    const getCount = (...keys: string[]) => periodData.filter(d => {
+      const jenjangStr = (d.jenjangName || d.jenjang || '').toLowerCase();
+      return keys.some(key => jenjangStr.includes(key));
+    }).length;
     
     return [
-      { name: 'RA (TK)', total: getCount('ra') || getCount('raudhatul') },
-      { name: 'Ula (SD)', total: getCount('ula') },
-      { name: 'Wustho (SMP)', total: getCount('wustho') },
-      { name: 'Ulya (SMA)', total: getCount('ulya') },
-      { name: 'Ma\'had Aly', total: getCount('aly') }
+      { name: 'RA (TK)', total: getCount('ra', 'raudhatul', 'tk') },
+      { name: 'Ula (SD)', total: getCount('ula', 'sd') },
+      { name: 'Wustho (SMP)', total: getCount('wustho', 'smp') },
+      { name: 'Ulya (SMA)', total: getCount('ulya', 'sma') },
+      { name: 'Ma\'had Aly', total: getCount('aly', 'mahad') }
     ];
   };
   
   const chartData = getChartData();
 
   const getAsalSekolahChartData = () => {
-    // 1. Filter data only for Wustho and Ulya
-    const wusthoUlyaData = data.filter(d => {
-      const j = (d.jenjangName || d.jenjang || '').toLowerCase();
-      return j.includes('wustho') || j.includes('ulya');
-    });
+    // Group by asalSekolah using filteredData (so it respects the selected filterJenjang)
+    const schools: Record<string, { name: string, total: number, [key: string]: any }> = {};
 
-    // 2. Group by asalSekolah
-    const schools: Record<string, { name: string, wustho: number, ulya: number, total: number }> = {};
+    // Helper to normalize school names for better grouping
+    const normalizeSchoolName = (name: string) => {
+      let normalized = name.toLowerCase().trim();
 
-    wusthoUlyaData.forEach(d => {
-      let sekolah = (d.asalSekolah || d.asal_sekolah || '-').trim();
-      if (!sekolah || sekolah === '-') sekolah = 'Tidak Diketahui';
-      
-      const j = (d.jenjangName || d.jenjang || '').toLowerCase();
-      
-      if (!schools[sekolah]) {
-        schools[sekolah] = { name: sekolah, wustho: 0, ulya: 0, total: 0 };
+      // Known canonical mappings (aliases)
+      if (normalized.includes('zaadul') || normalized.includes('zadul') || normalized.includes("ma'ad") || normalized.includes('maad')) {
+        return "PPS Zaadul Ma'ad Palembang";
+      }
+      if (normalized.includes('izzah')) {
+        return "PPTQ AL-IZZAH PALEMBANG";
+      }
+      if (normalized.includes('faza') || normalized.includes('fasa')) {
+        if (normalized.includes('smp')) return "SMP Islam Faza Palembang";
+        if (normalized.includes('sd')) return "SD Islam Faza Palembang";
+      }
+      if (normalized.includes('istiqomah')) {
+        if (normalized.includes('smp')) return "SMP IT AL ISTIQOMAH Prabumulih";
+        if (normalized.includes('sd')) return "SD IT AL ISTIQOMAH Prabumulih";
+      }
+      if (normalized.includes('mutiara sunnah')) {
+        return "PPTQ Mutiara Sunnah Palembang";
+      }
+      if (normalized.includes('darussalam') && (normalized.includes('tanjung') || normalized.includes('telang') || normalized.includes('pesantren'))) {
+        return "Ponpes Darussalam Tanjung Telang";
       }
 
-      if (j.includes('wustho')) {
-        schools[sekolah].wustho += 1;
-      } else if (j.includes('ulya')) {
-        schools[sekolah].ulya += 1;
+      // Remove common punctuation and extra spaces
+      normalized = normalized.replace(/[.-]/g, ' ').replace(/\s+/g, ' ').trim();
+      // Normalize common abbreviations
+      normalized = normalized.replace(/\bsd it\b/g, 'sdit');
+      normalized = normalized.replace(/\bsmp it\b/g, 'smpit');
+      normalized = normalized.replace(/\bsma it\b/g, 'smait');
+      return normalized;
+    };
+
+    const CANONICAL_NAMES = [
+      "PPS Zaadul Ma'ad Palembang",
+      "PPTQ AL-IZZAH PALEMBANG",
+      "SMP Islam Faza Palembang",
+      "SD Islam Faza Palembang",
+      "SMP IT AL ISTIQOMAH Prabumulih",
+      "SD IT AL ISTIQOMAH Prabumulih",
+      "PPTQ Mutiara Sunnah Palembang",
+      "Ponpes Darussalam Tanjung Telang"
+    ];
+
+    // Keep track of the original names to use the most common one for display
+    const originalNamesMap: Record<string, Record<string, number>> = {};
+
+    filteredData.forEach(d => {
+      let rawSekolah = (d.asalSekolah || d.asal_sekolah || '-').trim();
+      if (!rawSekolah || rawSekolah === '-') rawSekolah = 'Tidak Diketahui';
+      
+      const normalizedSekolah = rawSekolah === 'Tidak Diketahui' ? rawSekolah : normalizeSchoolName(rawSekolah);
+      
+      // Track original names to pick the best representation later
+      if (!originalNamesMap[normalizedSekolah]) {
+        originalNamesMap[normalizedSekolah] = {};
       }
-      schools[sekolah].total += 1;
+      originalNamesMap[normalizedSekolah][rawSekolah] = (originalNamesMap[normalizedSekolah][rawSekolah] || 0) + 1;
+      
+      const rawJenjang = d.jenjangName || d.jenjang || '';
+      let j = rawJenjang.trim();
+      if (!j) j = 'Lainnya';
+      
+      if (!schools[normalizedSekolah]) {
+        schools[normalizedSekolah] = { name: normalizedSekolah, total: 0 };
+      }
+      
+      if (!schools[normalizedSekolah][j]) {
+        schools[normalizedSekolah][j] = 0;
+      }
+      
+      schools[normalizedSekolah][j] += 1;
+      schools[normalizedSekolah].total += 1;
     });
 
-    // 3. Convert to array and sort by total descending, take top 10
+    // Pick the most common original name for each normalized group
+    Object.keys(schools).forEach(normKey => {
+      if (normKey !== 'Tidak Diketahui') {
+        if (CANONICAL_NAMES.includes(normKey)) {
+          schools[normKey].name = normKey;
+        } else {
+          const originalCounts = originalNamesMap[normKey];
+          // Sort by count descending, then pick the first (most common) original name
+          const mostCommonName = Object.keys(originalCounts).sort((a, b) => originalCounts[b] - originalCounts[a])[0];
+          // Capitalize words nicely if it looks messy, but for now we'll just use the user-typed one
+          schools[normKey].name = mostCommonName;
+        }
+      }
+    });
+
+    // Convert to array and sort by total descending, take top 5
     return Object.values(schools)
       .filter(s => s.name !== 'Tidak Diketahui')
       .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
+      .slice(0, 5);
   };
 
   const asalSekolahChartData = getAsalSekolahChartData();
+
+  // Get unique jenjang keys for the stacked bar
+  const jenjangKeysForChart = Array.from(
+    new Set(
+      asalSekolahChartData.flatMap(item => 
+        Object.keys(item).filter(k => k !== 'name' && k !== 'total')
+      )
+    )
+  );
+
+  // Generate colors for jenjang keys
+  const getJenjangColor = (jenjang: string) => {
+    const l = jenjang.toLowerCase();
+    if (l.includes('wustho')) return '#10b981';
+    if (l.includes('ulya')) return '#3b82f6';
+    if (l.includes('ula')) return '#f59e0b';
+    if (l.includes('raudhatul')) return '#ec4899';
+    if (l.includes('aly')) return '#8b5cf6';
+    return '#64748b';
+  };
 
   const handleExportExcel = (jenjangToExport: string) => {
     let dataToExport = data.filter(d => (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi'));
@@ -265,6 +389,13 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
   
   const transferCount = filteredData.filter(d => (d.metodePembayaran || '').toLowerCase() === 'transfer').length;
   const tunaiCount = filteredData.filter(d => (d.metodePembayaran || '').toLowerCase() !== 'transfer').length;
+
+  // Pagination Logic
+  const totalPagesVerified = Math.ceil(verifiedData.length / ITEMS_PER_PAGE);
+  const paginatedVerifiedData = verifiedData.slice(
+    (currentPageVerified - 1) * ITEMS_PER_PAGE,
+    currentPageVerified * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -352,23 +483,23 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-center">
                 <p className="text-slate-500 text-sm font-semibold mb-1">RA (TK)</p>
-                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('RA')}</p>
+                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('ra', 'raudhatul', 'tk')}</p>
               </div>
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-center">
                 <p className="text-slate-500 text-sm font-semibold mb-1">Ula (SD)</p>
-                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('Ula')}</p>
+                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('ula', 'sd')}</p>
               </div>
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-center">
                 <p className="text-slate-500 text-sm font-semibold mb-1">Wustho (SMP)</p>
-                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('Wustho')}</p>
+                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('wustho', 'smp')}</p>
               </div>
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-center">
                 <p className="text-slate-500 text-sm font-semibold mb-1">Ulya (SMA)</p>
-                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('Ulya')}</p>
+                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('ulya', 'sma')}</p>
               </div>
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-center">
                 <p className="text-slate-500 text-sm font-semibold mb-1">Ma'had Aly</p>
-                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('Mahad')}</p>
+                <p className="text-2xl font-bold text-slate-800">{getCountByJenjang('aly', 'mahad')}</p>
               </div>
             </div>
           </div>
@@ -415,8 +546,8 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
         {/* Grafik Asal Sekolah */}
         <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mb-8">
           <div className="mb-6">
-            <h3 className="text-xl font-bold text-slate-800">Top 10 Asal Sekolah (Wustho & Ulya)</h3>
-            <p className="text-sm text-slate-500">Berdasarkan pendaftar jenjang Salafiyah Wustho dan Salafiyah Ulya</p>
+            <h3 className="text-xl font-bold text-slate-800">Top 5 Sekolah Asal Pendaftar</h3>
+            <p className="text-sm text-slate-500">Berdasarkan jenjang yang dipilih: {filterJenjang === 'Semua' ? 'Semua Jenjang' : filterJenjang}</p>
           </div>
           
           <div className="h-72 sm:h-96 w-full mt-4">
@@ -440,8 +571,23 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                     contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'}}
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="wustho" name="Salafiyah Wustho" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="ulya" name="Salafiyah Ulya" stackId="a" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                  {jenjangKeysForChart.map((key, index) => {
+                    const isLast = index === jenjangKeysForChart.length - 1;
+                    return (
+                      <Bar 
+                        key={key} 
+                        dataKey={key} 
+                        name={key} 
+                        stackId="a" 
+                        fill={getJenjangColor(key)} 
+                        radius={isLast ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                      >
+                        {isLast && (
+                          <LabelList dataKey="total" position="top" fill="#64748b" fontSize={14} fontWeight="bold" />
+                        )}
+                      </Bar>
+                    );
+                  })}
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -601,7 +747,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                     </td>
                   </tr>
                 ) : (
-                  verifiedData.map((row, idx) => (
+                  paginatedVerifiedData.map((row, idx) => (
                     <tr key={idx} className="bg-white border-b border-slate-50 hover:bg-slate-50">
                       <td className="px-6 py-4 font-mono font-bold text-emerald-600">{row.nomorPeserta || '-'}</td>
                       <td className="px-6 py-4 font-mono text-slate-600">{row.nomorRegistrasi || '-'}</td>
@@ -623,6 +769,62 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
               </tbody>
             </table>
           </div>
+          {totalPagesVerified > 1 && (
+            <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 rounded-b-[1.5rem]">
+              <span className="text-xs sm:text-sm text-slate-500 font-medium">
+                Menampilkan {(currentPageVerified - 1) * ITEMS_PER_PAGE + 1} - {Math.min(currentPageVerified * ITEMS_PER_PAGE, verifiedData.length)} dari {verifiedData.length} Data
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPageVerified(p => Math.max(1, p - 1))}
+                  disabled={currentPageVerified === 1}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <div className="flex items-center gap-1 px-2">
+                  {Array.from({ length: totalPagesVerified }).map((_, i) => {
+                    const page = i + 1;
+                    // Show only some pages on mobile or desktop to be minimal
+                    if (
+                      page === 1 || 
+                      page === totalPagesVerified || 
+                      (page >= currentPageVerified - 1 && page <= currentPageVerified + 1)
+                    ) {
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPageVerified(page)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${
+                            currentPageVerified === page
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    } else if (
+                      page === currentPageVerified - 2 || 
+                      page === currentPageVerified + 2
+                    ) {
+                      return <span key={page} className="text-slate-400 px-1 text-xs">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPageVerified(p => Math.min(totalPagesVerified, p + 1))}
+                  disabled={currentPageVerified === totalPagesVerified}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-800 disabled:opacity-50 disabled:hover:bg-transparent transition-colors"
+                  aria-label="Next page"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
