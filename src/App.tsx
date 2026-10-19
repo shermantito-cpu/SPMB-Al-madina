@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import RegistrationInfo from './RegistrationInfo';
 import PromoPopup from './components/PromoPopup';
+import { PWAInstallButton } from "./components/PWAInstallButton";
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -207,6 +208,7 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
+            <PWAInstallButton />
             {currentUser ? (
               <div className="flex items-center gap-2 sm:gap-4">
                 <button 

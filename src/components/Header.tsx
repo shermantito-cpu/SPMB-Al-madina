@@ -1,3 +1,4 @@
+import { PWAInstallButton } from "./PWAInstallButton";
 import React from 'react';
 import { 
   GraduationCap, 
@@ -43,7 +44,8 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline text-emerald-300">Kuota Terbatas Tiap Jenjang</span>
           </div>
 
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-3 sm:gap-4 text-xs">
+            <PWAInstallButton variant="header" />
             <button 
               onClick={openSpreadsheetModal}
               id="btn-open-gas-config"

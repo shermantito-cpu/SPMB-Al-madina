@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spmb-cache-v2';
+const CACHE_NAME = 'spmb-cache-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -7,9 +7,12 @@ self.addEventListener('install', (event) => {
       return cache.addAll([
         '/',
         '/index.html',
+        '/manifest.json',
         '/icon-192.png',
         '/icon-512.png'
-      ]);
+      ]).catch((err) => {
+        console.warn('PWA Precache failed non-critically:', err);
+      });
     })
   );
 });
@@ -29,6 +32,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (!event.request.url.startsWith('http')) return;
+
+  // Let API requests and POST pass directly
+  if (event.request.url.includes('/api/') || event.request.method !== 'GET') {
+    return;
+  }
+
   if (event.request.mode === 'navigate' || (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
     event.respondWith(
       fetch(event.request)
@@ -37,7 +47,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(event.request).then((res) => res || caches.match('/index.html')))
     );
     return;
   }
