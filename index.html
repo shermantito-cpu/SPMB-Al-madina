@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
+    <!-- Favicon & PWA Icons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
     <!-- PWA Settings -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#059669" />
@@ -11,7 +17,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="SPMB Madina" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
 
     <title>SPMB Pondok Pesantren Al-Madina 2027/2028 - Prabumulih</title>
     <meta name="description" content="Sistem Penerimaan Murid Baru (SPMB) Pondok Pesantren Al-Madina Prabumulih Tahun Ajaran 2027/2028. Pendaftaran online terhubung Google Spreadsheet." />
@@ -32,10 +37,10 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(registration => {
-            console.log('SW registered: ', registration);
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+            console.log('SW registered successfully:', registration);
           }).catch(registrationError => {
-            console.log('SW registration failed: ', registrationError);
+            console.warn('SW registration failed:', registrationError);
           });
         });
       }

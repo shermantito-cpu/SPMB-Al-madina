@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spmb-cache-v3';
+const CACHE_NAME = 'spmb-cache-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -8,8 +8,11 @@ self.addEventListener('install', (event) => {
         '/',
         '/index.html',
         '/manifest.json',
+        '/favicon.ico',
         '/icon-192.png',
-        '/icon-512.png'
+        '/icon-512.png',
+        '/icon-maskable-512.png',
+        '/apple-touch-icon.png'
       ]).catch((err) => {
         console.warn('PWA Precache failed non-critically:', err);
       });
