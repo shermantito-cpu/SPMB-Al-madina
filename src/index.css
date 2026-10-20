@@ -40,3 +40,19 @@
     page-break-inside: avoid !important;
   }
 }
+
+/* Hide Netlify injected badge / HUD / "Powered by Netlify" */
+#nl-badge-frame,
+#nl-hud-frame,
+iframe[title*="Netlify"],
+iframe[title*="Powered by Netlify"],
+[data-netlify-site-id] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spmb-cache-v4';
+const CACHE_NAME = 'spmb-cache-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -9,6 +9,7 @@ self.addEventListener('install', (event) => {
         '/index.html',
         '/manifest.json',
         '/favicon.ico',
+        '/logp.png',
         '/icon-192.png',
         '/icon-512.png',
         '/icon-maskable-512.png',
@@ -37,7 +38,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith('http')) return;
 
-  // Let API requests and POST pass directly
+  // Let API requests pass directly
   if (event.request.url.includes('/api/') || event.request.method !== 'GET') {
     return;
   }

@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#064e3b",
-  "theme_color": "#059669",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "description": "Sistem Penerimaan Santri Baru Pondok Pesantren Al-Madina Prabumulih",
   "icons": [
     {

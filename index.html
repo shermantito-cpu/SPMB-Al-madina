@@ -12,7 +12,7 @@
 
     <!-- PWA Settings -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#059669" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -30,11 +30,40 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Amiri:wght@700&display=swap" rel="stylesheet">
+
+    <!-- CSS Rule to suppress Netlify HUD / "Powered by Netlify" Badge -->
+    <style>
+      #nl-badge-frame,
+      #nl-hud-frame,
+      iframe[title*="Netlify"],
+      iframe[title*="Powered by Netlify"],
+      [data-netlify-site-id] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        position: absolute !important;
+        left: -9999px !important;
+      }
+    </style>
   </head>
   <body class="bg-slate-50 antialiased font-sans text-slate-800">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Splash Screen Awal: Background Putih & Logo logp.png Proporsional di Tengah -->
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #ffffff; padding: 24px;">
+        <img 
+          src="/logp.png" 
+          alt="Pondok Pesantren Al-Madina" 
+          style="width: 250px; max-width: 65vw; height: auto; object-fit: contain;" 
+        />
+      </div>
+    </div>
+    
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Service Worker Registration
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
@@ -44,6 +73,19 @@
           });
         });
       }
+
+      // Automatically remove Netlify injected "Powered by Netlify" badge if rendered
+      const removeNetlifyBadge = () => {
+        const badge = document.getElementById('nl-badge-frame') || 
+                      document.getElementById('nl-hud-frame') || 
+                      document.querySelector('iframe[title*="Netlify"]');
+        if (badge) {
+          badge.remove();
+        }
+      };
+      removeNetlifyBadge();
+      const badgeObserver = new MutationObserver(removeNetlifyBadge);
+      badgeObserver.observe(document.documentElement, { childList: true, subtree: true });
     </script>
   </body>
 </html>
