@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Home, Download, ArrowLeft, Users, CreditCard, Banknote, Filter, RefreshCw, CheckCircle, FileText, Check, Clock, PenTool, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, Download, ArrowLeft, Users, CreditCard, Banknote, Filter, RefreshCw, CheckCircle, FileText, Check, Clock, PenTool, ChevronLeft, ChevronRight, Layers, RotateCcw, Trash2, Calendar, AlertTriangle, X } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, updateDoc, query, orderBy, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, orderBy, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 
 export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () => void, onGoHome: () => void }) {
@@ -10,18 +10,37 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filterJenjang, setFilterJenjang] = useState('Semua');
+  const [filterGelombang, setFilterGelombang] = useState<'Semua' | '1' | '2'>('Semua');
+  const [filterTahunAjaran, setFilterTahunAjaran] = useState<string>('2027/2028');
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [verifyingUser, setVerifyingUser] = useState<any>(null);
   const [chartPeriod, setChartPeriod] = useState('Keseluruhan'); // 'Harian', 'Pekanan', 'Keseluruhan'
   const [isWusthoUlyaOpen, setIsWusthoUlyaOpen] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [currentPageVerified, setCurrentPageVerified] = useState(1);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTahunAjaran, setDeleteTahunAjaran] = useState<'2027/2028' | '2028/2029' | '2029/2030'>('2027/2028');
+  const [deleteGelombang, setDeleteGelombang] = useState<'1' | '2' | 'Semua'>('1');
+  const [confirmDeleteChecked, setConfirmDeleteChecked] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [cancelingUser, setCancelingUser] = useState<any | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const ITEMS_PER_PAGE = 15;
+
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => {
+      setToast(curr => (curr?.message === message ? null : curr));
+    }, 4500);
+  };
 
   // Reset pagination when filter changes
   useEffect(() => {
     setCurrentPageVerified(1);
-  }, [filterJenjang]);
+  }, [filterJenjang, filterGelombang, filterTahunAjaran]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'registrationControl'), (docSnap) => {
@@ -40,9 +59,10 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
     try {
       const ref = doc(db, 'settings', 'registrationControl');
       await setDoc(ref, { wusthoUlyaOpen: !isWusthoUlyaOpen }, { merge: true });
+      showToast('info', `Portal pendaftaran berhasil di-${!isWusthoUlyaOpen ? 'buka' : 'tutup'}.`);
     } catch (e) {
       console.error('Error toggling portal', e);
-      alert('Gagal merubah status portal');
+      showToast('error', 'Gagal merubah status portal');
     }
   };
 
@@ -66,27 +86,135 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
     fetchData();
   }, []);
 
+  // Helper to extract Jenjang code for Nomor Peserta (SA for SMA/Ulya, SW for SMP/Wustho, etc.)
+  const getJenjangParticipantCode = (jenjangInput: string = ''): string => {
+    const str = jenjangInput.toLowerCase();
+    if (str.includes('ulya') || str.includes('sma') || str.includes('aliyah') || str.includes('sa')) return 'SA';
+    if (str.includes('wustho') || str.includes('wustha') || str.includes('smp') || str.includes('sw')) return 'SW';
+    if (str.includes('ula') || str.includes('sd') || str.includes('su')) return 'SU';
+    if (str.includes('ra') || str.includes('raudhatul') || str.includes('tk') || str.includes('sr')) return 'SR';
+    if (str.includes('aly') || str.includes('mahad') || str.includes('sm')) return 'SM';
+    return 'SA';
+  };
+
+  // Helper to parse exact registration time in milliseconds
+  const getRegTimestamp = (item: any): number => {
+    if (item?.createdAt) {
+      if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+        return item.createdAt.seconds * 1000;
+      }
+      const t = new Date(item.createdAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (item?.tanggalDaftar) {
+      const parts = item.tanggalDaftar.split('/');
+      if (parts.length === 3) {
+        const d = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`);
+        if (!isNaN(d.getTime())) return d.getTime();
+      }
+    }
+    return 0;
+  };
+
+  // Helper to determine registration wave (Gelombang 1: s/d 30 Okt 2026, Gelombang 2: di atas 30 Okt 2026)
+  const getRegistrationWave = (item: any): 1 | 2 => {
+    if (!item) return 1;
+
+    // Check exact registration timestamp: pendaftar di atas 30 Oktober 2026 adalah Gelombang 2
+    const ts = getRegTimestamp(item);
+    if (ts > 0) {
+      const d = new Date(ts);
+      if (d.getFullYear() > 2026) return 2;
+      if (d.getFullYear() === 2026) {
+        if (d.getMonth() > 9) return 2; // Bulan November (10), Desember (11) adalah Gelombang 2
+        if (d.getMonth() === 9 && d.getDate() > 30) return 2; // Di atas tanggal 30 Oktober adalah Gelombang 2
+      }
+      return 1;
+    }
+
+    // Check if nomorPeserta starts with SPMB2- or SPMB1-
+    if (typeof item.nomorPeserta === 'string') {
+      if (item.nomorPeserta.startsWith('SPMB2-')) return 2;
+      if (item.nomorPeserta.startsWith('SPMB1-')) return 1;
+    }
+
+    if (item.gelombang === 2 || item.gelombang === '2' || item.gelombang === 'Gelombang 2') return 2;
+    if (item.gelombang === 1 || item.gelombang === '1' || item.gelombang === 'Gelombang 1') return 1;
+
+    return 1;
+  };
+
+  // Helper to extract academic year (Tahun Ajaran)
+  const getTahunAjaran = (item: any): string => {
+    if (item?.tahunAjaran) return item.tahunAjaran;
+    if (item?.nomorPeserta) {
+      if (item.nomorPeserta.includes('2829')) return '2028/2029';
+      if (item.nomorPeserta.includes('2930')) return '2029/2030';
+      if (item.nomorPeserta.includes('2728')) return '2027/2028';
+    }
+    // Data SPMB saat ini default 2027/2028
+    return '2027/2028';
+  };
+
+  const getTahunAjaranCode = (ta: string): string => {
+    if (ta === '2028/2029') return '2829';
+    if (ta === '2029/2030') return '2930';
+    return '2728';
+  };
+
+  // Function to compute Nomor Peserta based on chronological order of registration per jenjang, per gelombang, and per tahun ajaran
+  const generateNomorPesertaByTime = (targetUser: any, currentAllData: any[]): string => {
+    if (!targetUser) return '';
+    const jenjangCode = getJenjangParticipantCode(targetUser.jenjangName || targetUser.jenjang || '');
+    const wave = getRegistrationWave(targetUser);
+    const ta = getTahunAjaran(targetUser);
+    const taCode = getTahunAjaranCode(ta);
+    
+    // Filter all records in the same jenjang, same wave, and same Tahun Ajaran
+    const sameGroup = currentAllData.filter(d => {
+      const code = getJenjangParticipantCode(d.jenjangName || d.jenjang || '');
+      const w = getRegistrationWave(d);
+      const itemTa = getTahunAjaran(d);
+      return code === jenjangCode && w === wave && itemTa === ta;
+    });
+
+    // Sort ascending by registration time (earliest registered gets lowest sequence index)
+    sameGroup.sort((a, b) => {
+      const timeA = getRegTimestamp(a);
+      const timeB = getRegTimestamp(b);
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.nomorRegistrasi || a.id || '').localeCompare(b.nomorRegistrasi || b.id || '');
+    });
+
+    const targetId = targetUser.id || targetUser.noReg || targetUser.nomorRegistrasi;
+    const index = sameGroup.findIndex(d => (d.id || d.nomorRegistrasi) === targetId);
+    const seq = index !== -1 ? index + 1 : sameGroup.length + 1;
+    const padded = String(seq).padStart(3, '0');
+
+    // Contoh TA 2027/2028: SPMB1-SA2728001 (Gel 1) atau SPMB2-SA2728001 (Gel 2)
+    return `SPMB${wave}-${jenjangCode}${taCode}${padded}`;
+  };
+
   const handleVerifyAction = async (action: 'terima' | 'tolak') => {
     if (!verifyingUser) return;
-    const { id, jenjang, uid } = verifyingUser;
+    const { id, uid } = verifyingUser;
     const isTerima = action === 'terima';
-    // Removed window.confirm since we already use a custom modal for confirmation
 
     try {
       let newNomorPeserta = '';
       let newStatus = isTerima ? 'Terverifikasi' : 'Ditolak';
+      const wave = getRegistrationWave(verifyingUser);
+      const ta = getTahunAjaran(verifyingUser);
 
       if (isTerima) {
-        const currentYear = new Date().getFullYear() + 1;
-        const randomDigits = Math.floor(1000 + Math.random() * 9000);
-        const prefix = (jenjang || 'PMB').substring(0,3).toUpperCase();
-        newNomorPeserta = `PMB-${currentYear}-${prefix}-${randomDigits}`;
+        const targetItem = data.find(item => item.id === id || item.nomorRegistrasi === (verifyingUser.noReg || id)) || verifyingUser;
+        newNomorPeserta = generateNomorPesertaByTime(targetItem, data);
       }
 
       // Update Firestore for public_registrations
       await updateDoc(doc(db, 'public_registrations', id), {
         statusVerifikasi: newStatus,
-        ...(isTerima ? { nomorPeserta: newNomorPeserta } : {})
+        ...(isTerima ? { nomorPeserta: newNomorPeserta, gelombang: wave, tahunAjaran: ta } : {})
       });
 
       // Update for users/uid/registrations if uid exists
@@ -94,28 +222,210 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
          try {
             await updateDoc(doc(db, 'users', uid, 'registrations', id), {
                statusVerifikasi: newStatus,
-               ...(isTerima ? { nomorPeserta: newNomorPeserta } : {})
+               ...(isTerima ? { nomorPeserta: newNomorPeserta, gelombang: wave, tahunAjaran: ta } : {})
             });
          } catch(e) {
             console.warn("Failed to update user private subcollection:", e);
          }
       }
 
-      console.log(isTerima ? 'Pendaftar berhasil diverifikasi!' : 'Pendaftar ditolak.');
+      console.log(isTerima ? `Pendaftar berhasil diverifikasi dengan Nomor Peserta: ${newNomorPeserta}` : 'Pendaftar ditolak.');
       
       // Update state locally immediately for instant feedback
-      setData(prev => prev.map(item => item.id === id ? { ...item, statusVerifikasi: newStatus, ...(isTerima ? { nomorPeserta: newNomorPeserta } : {}) } : item));
+      setData(prev => prev.map(item => item.id === id ? { ...item, statusVerifikasi: newStatus, ...(isTerima ? { nomorPeserta: newNomorPeserta, gelombang: wave, tahunAjaran: ta } : {}) } : item));
       setVerifyingUser(null);
+      showToast('success', isTerima ? `Pendaftar ${verifyingUser.namaLengkap || ''} berhasil diverifikasi dengan No. Peserta: ${newNomorPeserta}` : 'Pendaftar telah ditolak.');
     } catch (err: any) {
       console.error("Error during verification:", err);
-      console.error('Gagal memproses pendaftar: ' + err.message);
+      showToast('error', 'Gagal memproses pendaftar: ' + (err.message || 'Terjadi kesalahan sistem.'));
     }
   };
 
-  // Filter Data
-  const filteredData = filterJenjang === 'Semua' 
-    ? data 
-    : data.filter(d => (d.jenjangName || d.jenjang || '').toLowerCase().includes(filterJenjang.toLowerCase()));
+  // Batalkan status verifikasi dan kembalikan ke menu Menunggu Verifikasi
+  const confirmCancelVerification = async () => {
+    if (!cancelingUser) return;
+    const docId = cancelingUser.id || cancelingUser.nomorRegistrasi || cancelingUser.noReg;
+    const nama = cancelingUser.namaLengkap || cancelingUser.nomorRegistrasi || 'pendaftar ini';
+
+    setIsCanceling(true);
+    try {
+      if (docId) {
+        // Update public_registrations
+        await updateDoc(doc(db, 'public_registrations', docId), {
+          statusVerifikasi: 'Menunggu Verifikasi',
+          nomorPeserta: ''
+        });
+      }
+
+      // Update user private subcollection if uid exists
+      if (cancelingUser.uid && docId) {
+        try {
+          await updateDoc(doc(db, 'users', cancelingUser.uid, 'registrations', docId), {
+            statusVerifikasi: 'Menunggu Verifikasi',
+            nomorPeserta: ''
+          });
+        } catch (e) {
+          console.warn("Failed to update private user doc on cancel verification:", e);
+        }
+      }
+
+      // Update local state immediately
+      setData(prev => prev.map(item => {
+        const itemId = item.id || item.nomorRegistrasi;
+        if (itemId === docId || (cancelingUser.nomorRegistrasi && item.nomorRegistrasi === cancelingUser.nomorRegistrasi)) {
+          return { ...item, statusVerifikasi: 'Menunggu Verifikasi', nomorPeserta: '' };
+        }
+        return item;
+      }));
+      setCancelingUser(null);
+      showToast('success', `Verifikasi untuk "${nama}" berhasil dibatalkan dan telah kembali ke menu Menunggu Verifikasi.`);
+    } catch (err: any) {
+      console.error("Gagal membatalkan verifikasi:", err);
+      showToast('error', 'Gagal membatalkan verifikasi: ' + (err.message || 'Terjadi kesalahan.'));
+    } finally {
+      setIsCanceling(false);
+    }
+  };
+
+  // Hapus Data secara massal berdasarkan Tahun Ajaran & Gelombang pilihan
+  const handleBatchDelete = async () => {
+    if (itemsToDelete.length === 0) {
+      showToast('error', "Tidak ada data pendaftar yang cocok untuk Tahun Ajaran dan Gelombang yang dipilih.");
+      return;
+    }
+
+    const gelombangLabel = deleteGelombang === '1' ? 'Gelombang Pertama' : deleteGelombang === '2' ? 'Gelombang Kedua' : 'Semua Gelombang';
+
+    setIsDeleting(true);
+    try {
+      const deleteIds = itemsToDelete.map(item => item.id || item.nomorRegistrasi).filter(Boolean);
+      
+      for (const item of itemsToDelete) {
+        const docId = item.id || item.nomorRegistrasi;
+        if (docId) {
+          try {
+            await deleteDoc(doc(db, 'public_registrations', docId));
+          } catch (e) {
+            console.error("Gagal menghapus public_registrations doc:", docId, e);
+          }
+        }
+        if (item.uid && docId) {
+          try {
+            await deleteDoc(doc(db, 'users', item.uid, 'registrations', docId));
+          } catch (e) {
+            console.warn("Could not delete from user subcollection:", e);
+          }
+        }
+      }
+
+      // Hapus data dari state lokal
+      setData(prev => prev.filter(item => {
+        const itemId = item.id || item.nomorRegistrasi;
+        return !deleteIds.includes(itemId) && !deleteIds.includes(item.nomorRegistrasi);
+      }));
+      setShowDeleteModal(false);
+      setConfirmDeleteChecked(false);
+      showToast('success', `Berhasil menghapus ${deleteIds.length} data pendaftar untuk Tahun Ajaran ${deleteTahunAjaran} (${gelombangLabel})!`);
+    } catch (err: any) {
+      console.error("Gagal menghapus data:", err);
+      showToast('error', "Gagal menghapus data: " + (err.message || 'Terjadi kesalahan.'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Function to sync and re-sequence all verified participants based on their registration time and wave
+  const handleExecuteSync = async () => {
+    setShowSyncModal(false);
+    setIsSyncing(true);
+    try {
+      const updates: { id: string; uid?: string; nomorPeserta: string; gelombang: number }[] = [];
+      const waves: (1 | 2)[] = [1, 2];
+      const jenjangCodes = ['SA', 'SW', 'SU', 'SR', 'SM'];
+
+      for (const wave of waves) {
+        for (const code of jenjangCodes) {
+          // Find all records in this jenjang and wave
+          const groupAll = data.filter(d => 
+            getJenjangParticipantCode(d.jenjangName || d.jenjang || '') === code && 
+            getRegistrationWave(d) === wave
+          );
+          
+          // Sort by registration time ascending
+          groupAll.sort((a, b) => {
+            const timeA = getRegTimestamp(a);
+            const timeB = getRegTimestamp(b);
+            if (timeA !== timeB) return timeA - timeB;
+            return (a.nomorRegistrasi || a.id || '').localeCompare(b.nomorRegistrasi || b.id || '');
+          });
+
+          // For each applicant in this wave & jenjang, calculate their chronological number
+          groupAll.forEach((item, index) => {
+            const isVerified = (item.statusVerifikasi || '').toLowerCase().includes('terverifikasi');
+            if (isVerified) {
+              const seq = index + 1;
+              const newNo = `SPMB${wave}-${code}2728${String(seq).padStart(3, '0')}`;
+              if (item.nomorPeserta !== newNo || item.gelombang !== wave) {
+                updates.push({ id: item.id, uid: item.uid, nomorPeserta: newNo, gelombang: wave });
+              }
+            }
+          });
+        }
+      }
+
+      if (updates.length === 0) {
+        showToast('info', "Semua Nomor Peserta pendaftar terverifikasi sudah terurut rapi sesuai gelombang!");
+        return;
+      }
+
+      // Execute updates in Firestore
+      for (const upd of updates) {
+        await updateDoc(doc(db, 'public_registrations', upd.id), {
+          nomorPeserta: upd.nomorPeserta,
+          gelombang: upd.gelombang
+        });
+        if (upd.uid) {
+          try {
+            await updateDoc(doc(db, 'users', upd.uid, 'registrations', upd.id), {
+              nomorPeserta: upd.nomorPeserta,
+              gelombang: upd.gelombang
+            });
+          } catch(e) {}
+        }
+      }
+
+      // Update state locally
+      setData(prev => prev.map(item => {
+        const found = updates.find(u => u.id === item.id);
+        return found ? { ...item, nomorPeserta: found.nomorPeserta, gelombang: found.gelombang } : item;
+      }));
+
+      showToast('success', `Berhasil memperbarui ${updates.length} Nomor Peserta sesuai urutan waktu dan gelombang pendaftaran!`);
+    } catch (err: any) {
+      console.error("Gagal sinkronisasi nomor peserta:", err);
+      showToast('error', "Gagal menyinkronkan nomor peserta: " + (err.message || 'Terjadi kesalahan.'));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Filter Data by Tahun Ajaran
+  const taFilteredData = data.filter(d => {
+    if (filterTahunAjaran === 'Semua') return true;
+    return getTahunAjaran(d) === filterTahunAjaran;
+  });
+
+  // Filter Data by Gelombang
+  const waveFilteredData = taFilteredData.filter(d => {
+    if (filterGelombang === 'Semua') return true;
+    return getRegistrationWave(d) === Number(filterGelombang);
+  });
+
+  // Filter Data by Jenjang
+  const filteredData = waveFilteredData.filter(d => {
+    if (filterJenjang === 'Semua') return true;
+    return (d.jenjangName || d.jenjang || '').toLowerCase().includes(filterJenjang.toLowerCase());
+  });
 
   const verifiedData = filteredData.filter(d => (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi'));
   const pendingData = filteredData.filter(d => {
@@ -123,11 +433,20 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
     return !status.includes('terverifikasi') && !status.includes('ditolak');
   });
 
-  const getCountByJenjang = (...keys: string[]) => data.filter(d => {
+  const getCountByJenjang = (...keys: string[]) => waveFilteredData.filter(d => {
     const jenjangStr = (d.jenjangName || d.jenjang || '').toLowerCase();
     const isTerverifikasi = (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi');
     return keys.some(key => jenjangStr.includes(key)) && isTerverifikasi;
   }).length;
+
+  // Data targeted for deletion in the batch delete modal
+  const itemsToDelete = data.filter(item => {
+    const itemTa = getTahunAjaran(item);
+    if (itemTa !== deleteTahunAjaran) return false;
+    const itemWave = getRegistrationWave(item);
+    if (deleteGelombang === 'Semua') return true;
+    return itemWave === Number(deleteGelombang);
+  });
 
   // Chart Data Calculation
   const getChartData = () => {
@@ -163,7 +482,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
     };
 
     // Filter by period
-    const periodData = data.filter(d => {
+    const periodData = waveFilteredData.filter(d => {
       let dateVal = d.createdAt;
       
       if (!dateVal && d.tanggalDaftar) {
@@ -323,15 +642,27 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
   };
 
   const handleExportExcel = (jenjangToExport: string) => {
-    let dataToExport = data.filter(d => (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi'));
+    let dataToExport = waveFilteredData.filter(d => (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi'));
     if (jenjangToExport !== 'Semua') {
       dataToExport = dataToExport.filter(d => (d.jenjangName || d.jenjang || '').toLowerCase().includes(jenjangToExport.toLowerCase()));
     }
 
-    // Menyiapkan data dengan urutan kolom sesuai permintaan
+    // Sort by Nomor Peserta or registration time ascending
+    dataToExport.sort((a, b) => {
+      if (a.nomorPeserta && b.nomorPeserta) {
+        return a.nomorPeserta.localeCompare(b.nomorPeserta);
+      }
+      return getRegTimestamp(a) - getRegTimestamp(b);
+    });
+
+    // Menyiapkan data dengan urutan kolom sesuai permintaan (menyertakan Tahun Ajaran, Gelombang & Nomor Peserta SPMB)
     const excelData = dataToExport.map(item => ({
-      'Tanggal Daftar': item.createdAt ? new Date(item.createdAt).toLocaleString('id-ID') : '',
+      'Tahun Ajaran': getTahunAjaran(item),
+      'Gelombang': `Gelombang ${getRegistrationWave(item)}`,
+      'Nomor Peserta': item.nomorPeserta || '',
+      'Tanggal Daftar': item.createdAt ? new Date(item.createdAt).toLocaleString('id-ID') : (item.tanggalDaftar || ''),
       'Nomor Registrasi': item.nomorRegistrasi || '',
+      'Jenjang': item.jenjangName || item.jenjang || '',
       'Nama Lengkap': item.namaLengkap || '',
       'NIK': item.nik || '',
       'Tempat Lahir': item.tempatLahir || '',
@@ -356,8 +687,12 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
 
     // Mengatur lebar kolom agar rapi saat dibuka di Excel
     const colWidths = [
+      { wch: 15 }, // Tahun Ajaran
+      { wch: 15 }, // Gelombang
+      { wch: 22 }, // Nomor Peserta
       { wch: 20 }, // Tanggal Daftar
       { wch: 18 }, // Nomor Registrasi
+      { wch: 18 }, // Jenjang
       { wch: 25 }, // Nama Lengkap
       { wch: 20 }, // NIK
       { wch: 15 }, // Tempat Lahir
@@ -380,15 +715,20 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
 
     // Membuat workbook baru dan menambahkan worksheet
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data Pendaftar");
+    const sheetName = filterGelombang === 'Semua' ? 'Data Pendaftar' : `Gelombang ${filterGelombang}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
     // Menyimpan dan mengunduh file Excel
+    const waveTag = filterGelombang === 'Semua' ? 'Semua_Gelombang' : `Gelombang_${filterGelombang}`;
     const fileName = jenjangToExport === 'Semua' ? 'Semua_Jenjang' : jenjangToExport.replace('/', '_');
-    XLSX.writeFile(wb, `Data_Pendaftar_Terverifikasi_${fileName}_${new Date().getTime()}.xlsx`);
+    XLSX.writeFile(wb, `Data_Pendaftar_Terverifikasi_${waveTag}_${fileName}_${new Date().getTime()}.xlsx`);
   };
   
   const transferCount = filteredData.filter(d => (d.metodePembayaran || '').toLowerCase() === 'transfer').length;
   const tunaiCount = filteredData.filter(d => (d.metodePembayaran || '').toLowerCase() !== 'transfer').length;
+
+  const totalGelombang1 = taFilteredData.filter(d => getRegistrationWave(d) === 1).length;
+  const totalGelombang2 = taFilteredData.filter(d => getRegistrationWave(d) === 2).length;
 
   // Pagination Logic
   const totalPagesVerified = Math.ceil(verifiedData.length / ITEMS_PER_PAGE);
@@ -453,20 +793,94 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
           </div>
         )}
 
-        <div className="flex items-center gap-2 mb-6">
-          <Filter size={20} className="text-slate-400" />
-          <select 
-            value={filterJenjang} 
-            onChange={(e) => setFilterJenjang(e.target.value)}
-            className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 font-medium shadow-sm"
-          >
-            <option value="Semua">Semua Jenjang</option>
-            <option value="Ulya">Salafiyah Ulya (SMA)</option>
-            <option value="Wustho">Salafiyah Wustho (SMP)</option>
-            <option value="Ula">Salafiyah Ula (SD)</option>
-            <option value="Aly">Tadribud Du'at/Ma'had Aly (D3/S1)</option>
-            <option value="Raudhatul">Raudhatul Athfal (RA/TK)</option>
-          </select>
+        {/* Kontrol Filter Gelombang, Tahun Ajaran & Jenjang */}
+        <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200/80 mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          {/* Segmented Wave Switcher with Icon */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+            <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 shrink-0" title="Filter Gelombang">
+              <Layers size={18} />
+            </div>
+            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl gap-1 shrink-0">
+              <button
+                onClick={() => setFilterGelombang('Semua')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterGelombang === 'Semua'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>Semua Gelombang</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${filterGelombang === 'Semua' ? 'bg-slate-800 text-emerald-400' : 'bg-slate-200 text-slate-700'}`}>
+                  {taFilteredData.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setFilterGelombang('1')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterGelombang === '1'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-blue-700'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span>Gelombang 1</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${filterGelombang === '1' ? 'bg-blue-700 text-white' : 'bg-blue-100 text-blue-800'}`}>
+                  {totalGelombang1}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setFilterGelombang('2')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterGelombang === '2'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-emerald-700'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Gelombang 2</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${filterGelombang === '2' ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {totalGelombang2}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filters: Tahun Ajaran & Jenjang */}
+          <div className="flex flex-wrap items-center gap-2 self-end md:self-auto shrink-0">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-xs">
+              <Calendar size={14} className="text-slate-400" />
+              <select
+                value={filterTahunAjaran}
+                onChange={(e) => setFilterTahunAjaran(e.target.value)}
+                className="bg-transparent text-slate-700 text-xs sm:text-sm font-semibold focus:outline-none cursor-pointer"
+                title="Filter Tahun Ajaran"
+              >
+                <option value="2027/2028">TA 2027/2028</option>
+                <option value="2028/2029">TA 2028/2029</option>
+                <option value="2029/2030">TA 2029/2030</option>
+                <option value="Semua">Semua TA</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-xs">
+              <Filter size={14} className="text-slate-400" />
+              <select 
+                value={filterJenjang} 
+                onChange={(e) => setFilterJenjang(e.target.value)}
+                className="bg-transparent text-slate-700 text-xs sm:text-sm font-semibold focus:outline-none cursor-pointer"
+                title="Filter Jenjang"
+              >
+                <option value="Semua">Semua Jenjang</option>
+                <option value="Ulya">Salafiyah Ulya (SMA)</option>
+                <option value="Wustho">Salafiyah Wustho (SMP)</option>
+                <option value="Ula">Salafiyah Ula (SD)</option>
+                <option value="Aly">Tadribud Du'at/Ma'had Aly (D3/S1)</option>
+                <option value="Raudhatul">Raudhatul Athfal (RA/TK)</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Ringkasan & Statistik Utama */}
@@ -475,7 +889,9 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
             <div className="absolute top-0 right-0 p-6 opacity-20"><Users size={80} /></div>
             <p className="text-emerald-100 font-semibold mb-1 relative z-10">Total Terverifikasi</p>
             <h2 className="text-5xl font-extrabold relative z-10">{verifiedData.length}</h2>
-            <p className="text-sm text-emerald-100 mt-2 relative z-10">Filter: {filterJenjang}</p>
+            <p className="text-sm text-emerald-100 mt-2 relative z-10">
+              Filter: {filterGelombang === 'Semua' ? '' : `Gel. ${filterGelombang} • `}{filterJenjang}
+            </p>
           </div>
 
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 lg:col-span-3">
@@ -639,6 +1055,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
               <thead className="text-xs text-slate-700 uppercase bg-slate-50">
                 <tr>
                   <th className="px-6 py-4">No. Reg</th>
+                  <th className="px-6 py-4">Gelombang</th>
                   <th className="px-6 py-4">Nama Lengkap</th>
                   <th className="px-6 py-4">Jenjang</th>
                   <th className="px-6 py-4">Bukti</th>
@@ -648,7 +1065,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
               <tbody>
                 {pendingData.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                       Tidak ada pendaftar yang menunggu verifikasi.
                     </td>
                   </tr>
@@ -656,6 +1073,11 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                   pendingData.map((row, idx) => (
                     <tr key={idx} className="bg-white border-b border-slate-50 hover:bg-slate-50">
                       <td className="px-6 py-4 font-mono text-slate-900">{row.nomorRegistrasi || '-'}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${getRegistrationWave(row) === 2 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-blue-100 text-blue-800 border border-blue-200'}`}>
+                          Gel. {getRegistrationWave(row)}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 font-semibold text-slate-800">{row.namaLengkap || '-'}</td>
                       <td className="px-6 py-4">{row.jenjang || row.jenjangName || '-'}</td>
                       <td className="px-6 py-4">
@@ -672,7 +1094,7 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                       </td>
                       <td className="px-6 py-4">
                         <button 
-                          onClick={() => setVerifyingUser({ id: row.id, jenjang: row.jenjangName || row.jenjang || 'PMB', uid: row.uid, namaLengkap: row.namaLengkap, noReg: row.nomorRegistrasi })}
+                          onClick={() => setVerifyingUser({ ...row, id: row.id, jenjang: row.jenjangName || row.jenjang || 'PMB', uid: row.uid, namaLengkap: row.namaLengkap, noReg: row.nomorRegistrasi })}
                           className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-colors"
                         >
                           <Check size={14} /> Verifikasi
@@ -688,22 +1110,44 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
 
         {/* Tabel Data Terverifikasi */}
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
-          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-[1.5rem]">
+          <div className="px-6 py-5 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center bg-slate-50/50 rounded-t-[1.5rem]">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <CheckCircle size={20} className="text-emerald-500" /> Pendaftar Terverifikasi
             </h3>
-            <div className="relative inline-block">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-                className="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                onClick={() => setShowSyncModal(true)}
+                disabled={isSyncing}
+                className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 border border-slate-200 cursor-pointer"
+                title="Sinkronkan Nomor Peserta agar urut sesuai tanggal & waktu pendaftaran masing-masing perangkat"
               >
-                <Download size={14} /> Download Excel (.xlsx)
+                <RefreshCw size={13} className={isSyncing ? "animate-spin text-emerald-600" : "text-slate-600"} />
+                <span className="hidden sm:inline">{isSyncing ? 'Menyinkronkan...' : 'Urutkan No. Peserta'}</span>
+                <span className="sm:hidden">Urutkan</span>
               </button>
+
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border border-rose-200"
+                title="Hapus data pendaftar berdasarkan Tahun Ajaran dan Gelombang"
+              >
+                <Trash2 size={13} className="text-rose-600" />
+                <span className="hidden sm:inline">Hapus Data</span>
+                <span className="sm:hidden">Hapus</span>
+              </button>
+
+              <div className="relative inline-block">
+                <button
+                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                  className="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                >
+                  <Download size={14} /> Download Excel (.xlsx)
+                </button>
               
               {showDownloadMenu && (
                 <div className="absolute right-0 bottom-full mb-2 w-56 bg-white border border-slate-200 rounded-lg shadow-xl z-[60] overflow-hidden">
                   <div className="px-3 py-2 text-xs font-bold text-slate-500 bg-slate-50 border-b border-slate-100">
-                    Pilih Jenjang:
+                    Pilih Jenjang ({filterGelombang === 'Semua' ? 'Semua Gel.' : `Gel. ${filterGelombang}`}):
                   </div>
                   {[
                     { label: 'Semua Jenjang', value: 'Semua' },
@@ -728,21 +1172,24 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
               )}
             </div>
           </div>
+        </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-slate-500">
               <thead className="text-xs text-slate-700 uppercase bg-slate-50">
                 <tr>
                   <th className="px-6 py-4">No. Peserta</th>
+                  <th className="px-6 py-4">Gelombang</th>
                   <th className="px-6 py-4">No. Reg</th>
                   <th className="px-6 py-4">Nama Lengkap</th>
                   <th className="px-6 py-4">Jenjang</th>
                   <th className="px-6 py-4">Metode Bayar</th>
+                  <th className="px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {verifiedData.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                       Belum ada data pendaftar terverifikasi untuk filter ini.
                     </td>
                   </tr>
@@ -750,6 +1197,11 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                   paginatedVerifiedData.map((row, idx) => (
                     <tr key={idx} className="bg-white border-b border-slate-50 hover:bg-slate-50">
                       <td className="px-6 py-4 font-mono font-bold text-emerald-600">{row.nomorPeserta || '-'}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${getRegistrationWave(row) === 2 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-blue-100 text-blue-800 border border-blue-200'}`}>
+                          Gel. {getRegistrationWave(row)}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 font-mono text-slate-600">{row.nomorRegistrasi || '-'}</td>
                       <td className="px-6 py-4 font-semibold text-slate-800">{row.namaLengkap || '-'}</td>
                       <td className="px-6 py-4">
@@ -762,6 +1214,16 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
                           {(row.metodePembayaran || '').toLowerCase() === 'transfer' ? <CreditCard size={14} className="text-blue-500" /> : <Banknote size={14} className="text-emerald-500" />}
                           {row.metodePembayaran || '-'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => setCancelingUser(row)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                          title="Batalkan verifikasi (kembalikan ke antrean Menunggu Verifikasi)"
+                        >
+                          <RotateCcw size={12} className="text-amber-600" />
+                          <span>Batalkan</span>
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -833,9 +1295,25 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm px-4">
           <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl flex flex-col max-w-sm w-full">
             <h3 className="text-xl font-bold text-gray-800 mb-2">Verifikasi Pendaftar</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Anda akan memverifikasi pendaftar <strong>{verifyingUser.namaLengkap}</strong> ({verifyingUser.noReg}). Apakah pendaftar ini diterima atau ditolak?
+            <p className="text-sm text-gray-600 mb-4">
+              Anda akan memverifikasi pendaftar <strong>{verifyingUser.namaLengkap}</strong> ({verifyingUser.noReg}).
             </p>
+
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-5 text-left">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[11px] text-emerald-800 font-semibold">Nomor Peserta yang Diterbitkan:</p>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${getRegistrationWave(verifyingUser) === 2 ? 'bg-emerald-200 text-emerald-900' : 'bg-blue-200 text-blue-900'}`}>
+                  Gelombang {getRegistrationWave(verifyingUser)}
+                </span>
+              </div>
+              <p className="text-base font-mono font-bold text-emerald-900 tracking-wide">
+                {generateNomorPesertaByTime(verifyingUser, data)}
+              </p>
+              <p className="text-[10px] text-emerald-600 mt-1">
+                *Otomatis berurutan sesuai waktu pendaftaran perangkat ({verifyingUser.jenjang || verifyingUser.jenjangName || 'Semua'})
+              </p>
+            </div>
+
             <div className="flex gap-3">
               <button 
                 onClick={() => handleVerifyAction('terima')}
@@ -855,6 +1333,325 @@ export default function AdminDashboard({ onLogout, onGoHome }: { onLogout: () =>
               className="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-xl transition-colors"
             >
               Batal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Hapus Data Berdasarkan Tahun Ajaran & Gelombang */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-rose-950">Hapus Data Pendaftaran</h3>
+                  <p className="text-xs text-rose-700/80">Filter berdasarkan Tahun Ajaran & Gelombang</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => !isDeleting && setShowDeleteModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-rose-100/50 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              {/* 1. Pilih Tahun Ajaran */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-slate-500" />
+                  <span>1. Pilih Tahun Ajaran:</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['2027/2028', '2028/2029', '2029/2030'] as const).map(ta => (
+                    <button
+                      key={ta}
+                      type="button"
+                      onClick={() => setDeleteTahunAjaran(ta)}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                        deleteTahunAjaran === ta
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-slate-900/20'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {ta}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Pilih Gelombang */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Layers size={14} className="text-slate-500" />
+                  <span>2. Pilih Gelombang (T.A. {deleteTahunAjaran}):</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteGelombang('1')}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center gap-0.5 ${
+                      deleteGelombang === '1'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-500/30'
+                        : 'bg-blue-50/60 text-blue-800 border-blue-200 hover:bg-blue-100/60'
+                    }`}
+                  >
+                    <span>Gelombang Pertama</span>
+                    <span className={`text-[10px] ${deleteGelombang === '1' ? 'text-blue-100' : 'text-blue-600'}`}>
+                      ({data.filter(d => getTahunAjaran(d) === deleteTahunAjaran && getRegistrationWave(d) === 1).length} Data)
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeleteGelombang('2')}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center gap-0.5 ${
+                      deleteGelombang === '2'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/30'
+                        : 'bg-emerald-50/60 text-emerald-800 border-emerald-200 hover:bg-emerald-100/60'
+                    }`}
+                  >
+                    <span>Gelombang Kedua</span>
+                    <span className={`text-[10px] ${deleteGelombang === '2' ? 'text-emerald-100' : 'text-emerald-600'}`}>
+                      ({data.filter(d => getTahunAjaran(d) === deleteTahunAjaran && getRegistrationWave(d) === 2).length} Data)
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Ringkasan Data Target */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-slate-500 font-medium">Data yang akan dihapus:</span>
+                  <span className="font-bold text-slate-800 text-sm">
+                    {itemsToDelete.length} Pendaftar
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-200">
+                  <span>Terverifikasi: <strong>{itemsToDelete.filter(d => (d.statusVerifikasi || '').toLowerCase().includes('terverifikasi')).length}</strong></span>
+                  <span>Menunggu: <strong>{itemsToDelete.filter(d => !(d.statusVerifikasi || '').toLowerCase().includes('terverifikasi') && !(d.statusVerifikasi || '').toLowerCase().includes('ditolak')).length}</strong></span>
+                </div>
+              </div>
+
+              {/* Warning Alert */}
+              <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
+                <AlertTriangle size={16} className="shrink-0 text-amber-600 mt-0.5" />
+                <p>
+                  Data yang dihapus <strong>tidak dapat dikembalikan</strong>. Pastikan Anda telah mengunduh rekap Excel sebelum melanjutkan.
+                </p>
+              </div>
+
+              {/* Checkbox Konfirmasi */}
+              {itemsToDelete.length > 0 && (
+                <label className="flex items-center gap-2.5 cursor-pointer select-none text-xs text-rose-800 font-semibold p-3 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100/60 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={confirmDeleteChecked}
+                    onChange={e => setConfirmDeleteChecked(e.target.checked)}
+                    className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer shrink-0"
+                  />
+                  <span>Saya mengerti dan yakin ingin menghapus permanen {itemsToDelete.length} data pendaftar ini.</span>
+                </label>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setConfirmDeleteChecked(false);
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleBatchDelete}
+                disabled={isDeleting || itemsToDelete.length === 0 || !confirmDeleteChecked}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-all shadow-sm shadow-rose-600/30 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Hapus {itemsToDelete.length} Data</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Batalkan Verifikasi */}
+      {cancelingUser && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 bg-gradient-to-r from-amber-500 to-amber-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <RotateCcw size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">Batalkan Verifikasi?</h3>
+                  <p className="text-amber-100 text-xs">Kembalikan ke antrean Menunggu Verifikasi</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCancelingUser(null)}
+                disabled={isCanceling}
+                className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50/80 rounded-2xl p-4 border border-amber-200/80 space-y-2">
+                <div className="text-xs">
+                  <span className="font-semibold text-amber-800">Nama Lengkap:</span>
+                  <p className="font-bold text-sm text-slate-800 mt-0.5">{cancelingUser.namaLengkap || '-'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-amber-200/60">
+                  <div>
+                    <span className="text-amber-800 font-semibold">No. Registrasi:</span>
+                    <p className="font-mono font-bold text-slate-700 mt-0.5">{cancelingUser.nomorRegistrasi || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-amber-800 font-semibold">No. Peserta:</span>
+                    <p className="font-mono font-bold text-emerald-700 mt-0.5">{cancelingUser.nomorPeserta || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Status pendaftar akan dipindahkan kembali ke menu <strong>Menunggu Verifikasi</strong> dan Nomor Peserta akan dikosongkan. Anda dapat memverifikasi ulang pendaftar ini kapan saja.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCancelingUser(null)}
+                disabled={isCanceling}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelVerification}
+                disabled={isCanceling}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition-all shadow-sm shadow-amber-600/30 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                {isCanceling ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Membatalkan...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw size={14} />
+                    <span>Ya, Batalkan Verifikasi</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Sinkronisasi Nomor Peserta */}
+      {showSyncModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <RefreshCw size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">Urutkan Nomor Peserta</h3>
+                  <p className="text-slate-300 text-xs">Sinkronkan nomor urut pendaftar</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                className="text-white/80 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3 text-xs text-slate-600 leading-relaxed">
+              <p>
+                Fitur ini akan memperbarui dan menyinkronkan seluruh Nomor Peserta pendaftar terverifikasi agar urutan 3 angka terakhir sesuai dengan <strong>tanggal & waktu pendaftaran masing-masing</strong>:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-slate-700 font-medium">
+                <li>Gelombang 1: format <code className="text-blue-700 bg-blue-50 px-1 py-0.5 rounded">SPMB1-...</code></li>
+                <li>Gelombang 2: format <code className="text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded">SPMB2-...</code></li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSyncModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteSync}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-slate-900/30"
+              >
+                <RefreshCw size={14} />
+                <span>Mulai Sinkronkan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating In-App Toast Notification */}
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full px-4 animate-in slide-in-from-top-4 duration-200">
+          <div className={`rounded-2xl p-4 shadow-xl border flex items-start gap-3 backdrop-blur-md ${
+            toast.type === 'success' 
+              ? 'bg-emerald-950/90 text-emerald-100 border-emerald-500/40 shadow-emerald-950/30'
+              : toast.type === 'error'
+              ? 'bg-rose-950/90 text-rose-100 border-rose-500/40 shadow-rose-950/30'
+              : 'bg-slate-900/90 text-slate-100 border-slate-700 shadow-slate-900/30'
+          }`}>
+            <div className="shrink-0 mt-0.5">
+              {toast.type === 'success' && <CheckCircle size={18} className="text-emerald-400" />}
+              {toast.type === 'error' && <AlertTriangle size={18} className="text-rose-400" />}
+              {toast.type === 'info' && <RefreshCw size={18} className="text-blue-400" />}
+            </div>
+            <div className="flex-1 text-xs font-medium leading-relaxed">
+              {toast.message}
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="text-white/60 hover:text-white p-1 rounded-lg transition-colors shrink-0"
+            >
+              <X size={14} />
             </button>
           </div>
         </div>

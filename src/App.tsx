@@ -247,7 +247,7 @@ export default function App() {
             TAHUN AJARAN 2027 / 2028
           </div>
           <p className="text-lg md:text-xl text-emerald-50/90 leading-relaxed max-w-4xl mx-auto font-medium drop-shadow-sm mt-2">
-            Situs ini dipersiapkan sebagai pusat informasi dan pengolahan seleksi data murid peserta SPMB Pondok Pesantren Al-Madina Prabumulih secara online real time process untuk pelaksanaan SPMB Online.
+            Selamat datang di laman resmi SPMB Pondok Pesantren Al-Madina Prabumulih—melalui situs ini, Bapak/Ibu dapat melihat informasi lengkap, mendaftarkan calon santri, dan memantau hasil seleksi secara langsung dari rumah.
           </p>
         </div>
       </section>
@@ -262,7 +262,7 @@ export default function App() {
                 Cek Status Pendaftaran
               </h3>
               <p className="text-sm text-gray-500">
-                Sudah mendaftar? Masukkan nomor registrasi Anda untuk mengecek status dan mengunduh kartu ujian.
+                Sudah mendaftar? Masukkan nomor registrasi Anda untuk mengecek status dan Mengunduh Lembar Peserta Tes.
               </p>
             </div>
             <form onSubmit={handleGlobalCheck} className="flex-1 w-full flex flex-col sm:flex-row gap-3">
@@ -446,8 +446,8 @@ export default function App() {
               <div className="text-sm text-gray-600 mb-6 leading-relaxed text-left bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <p className="font-bold text-center mb-2 text-emerald-600">📣 SEGERA DIBUKA!</p>
                 <p className="text-center font-bold mb-4 text-gray-800">SPMB (Sistem Penerimaan Murid Baru)</p>
-                <p className="mb-2">✨ Gelombang Pertama:<br/>📅 09 September 2026</p>
-                <p>📌 Yuk, persiapkan segera dan jangan sampai ketinggalan pendaftaran gelombang pertama!</p>
+                <p className="mb-2">✨ Gelombang Kedua:<br/>📅 10 November 2027</p>
+                <p>📌 Yuk, persiapkan segera dan jangan sampai ketinggalan pendaftaran gelombang kedua!</p>
               </div>
             ) : (
               <p className="text-sm text-gray-600 mb-6 leading-relaxed">

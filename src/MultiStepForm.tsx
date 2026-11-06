@@ -550,7 +550,11 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
         buktiBase64 = await fileToBase64(formData.buktiPembayaran);
       }
 
-      // 2. Siapkan Data Payload ke Firestore
+      // 2. Siapkan Data Payload ke Firestore (Pendaftar di atas 30 Okt 2026 adalah Gelombang 2)
+      const now = new Date();
+      const isAfter30Oct2026 = now.getFullYear() > 2026 || (now.getFullYear() === 2026 && (now.getMonth() > 9 || (now.getMonth() === 9 && now.getDate() > 30)));
+      const currentWave = isAfter30Oct2026 ? 2 : 1;
+
       const { buktiPembayaran, ...payloadWithoutFile } = formData;
       const firestoreData = {
         ...payloadWithoutFile,
@@ -562,6 +566,8 @@ export default function MultiStepForm({ jenjang, jenjangName, onBack, initialChe
         tanggalDaftar: new Date().toLocaleDateString('id-ID'),
         statusVerifikasi: 'Menunggu Verifikasi',
         nomorPeserta: '', // Akan diisi admin saat verifikasi
+        gelombang: currentWave,
+        tahunAjaran: '2027/2028',
         uid: currentUser?.uid || '',
         akunEmail: currentUser?.email || ''
       };

@@ -18,6 +18,23 @@
   100% { transform: rotate(360deg); } 
 }
 
+/* Subtle Shimmer & Pulse Animation for CTA Button */
+@keyframes btnShine {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  35%, 100% { transform: translateX(250%) skewX(-20deg); }
+}
+.animate-btn-shine {
+  animation: btnShine 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.3; transform: scale(0.98); }
+  50% { opacity: 0.6; transform: scale(1.02); }
+}
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
 /* Print styling for official Kartu Ujian */
 @media print {
   body {

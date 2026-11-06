@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowRight } from 'lucide-react';
+import { X, ArrowRight, Sparkles } from 'lucide-react';
 
 const images = [
   '/ke1.jpeg',
@@ -74,14 +74,27 @@ export default function PromoPopup({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Action Area */}
-        <div className="px-6 py-6 sm:px-10 sm:py-8 text-center bg-white border-t border-slate-100 flex justify-center">
-          <button
-            onClick={onClose}
-            className="group relative w-full sm:w-auto inline-flex items-center justify-center gap-3 px-10 py-3.5 bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-600 hover:to-emerald-500 text-white text-[17px] font-semibold tracking-wide rounded-full shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/40 border border-emerald-600/50 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
-          >
-            Yuk Lanjut Mendaftar
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform duration-300" />
-          </button>
+        <div className="px-6 py-6 sm:px-10 sm:py-7 text-center bg-white border-t border-slate-100 flex justify-center">
+          <div className="relative group w-full sm:w-auto inline-flex items-center justify-center">
+            {/* Ambient Pulse Glow */}
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-700 rounded-2xl blur-sm opacity-40 group-hover:opacity-75 transition-opacity duration-300 animate-pulse-glow pointer-events-none" />
+
+            <button
+              onClick={onClose}
+              className="relative w-full sm:w-auto inline-flex items-center justify-center gap-3.5 px-8 sm:px-10 py-3.5 sm:py-4 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 hover:from-emerald-700 hover:via-emerald-600 hover:to-teal-700 text-white text-[16px] sm:text-[17px] font-semibold tracking-wide rounded-2xl shadow-xl shadow-emerald-950/20 border border-emerald-400/30 overflow-hidden transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
+            >
+              {/* Subtle light sweep animation */}
+              <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-btn-shine pointer-events-none" />
+
+              <Sparkles className="w-4 h-4 text-emerald-300 shrink-0 animate-pulse" />
+              
+              <span className="drop-shadow-sm">Yuk Lanjut Mendaftar</span>
+
+              <span className="w-7 h-7 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center group-hover:bg-white group-hover:text-emerald-800 transition-all duration-300 shadow-sm shrink-0">
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-300" />
+              </span>
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>
