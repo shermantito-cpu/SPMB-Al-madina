@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowRight, Sparkles } from 'lucide-react';
+import { X, ArrowRight, Sparkles, GraduationCap, ChevronRight } from 'lucide-react';
 
 const images = [
   '/ke1.jpeg',
@@ -11,7 +11,13 @@ const images = [
   '/ke6.jpeg'
 ];
 
-export default function PromoPopup({ onClose }: { onClose: () => void }) {
+export default function PromoPopup({ 
+  onClose, 
+  onOpenHasilSeleksi 
+}: { 
+  onClose: () => void; 
+  onOpenHasilSeleksi: () => void; 
+}) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -74,14 +80,15 @@ export default function PromoPopup({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Action Area */}
-        <div className="px-6 py-6 sm:px-10 sm:py-7 text-center bg-white border-t border-slate-100 flex justify-center">
+        <div className="px-6 py-5 sm:px-10 sm:py-6 text-center bg-white border-t border-slate-100 flex flex-col items-center gap-3">
+          {/* Tombol Utama: Yuk Lanjut Mendaftar */}
           <div className="relative group w-full sm:w-auto inline-flex items-center justify-center">
             {/* Ambient Pulse Glow */}
             <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-700 rounded-2xl blur-sm opacity-40 group-hover:opacity-75 transition-opacity duration-300 animate-pulse-glow pointer-events-none" />
 
             <button
               onClick={onClose}
-              className="relative w-full sm:w-auto inline-flex items-center justify-center gap-3.5 px-8 sm:px-10 py-3.5 sm:py-4 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 hover:from-emerald-700 hover:via-emerald-600 hover:to-teal-700 text-white text-[16px] sm:text-[17px] font-semibold tracking-wide rounded-2xl shadow-xl shadow-emerald-950/20 border border-emerald-400/30 overflow-hidden transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
+              className="relative w-full sm:w-auto inline-flex items-center justify-center gap-3.5 px-8 sm:px-10 py-3.5 sm:py-4 bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 hover:from-emerald-700 hover:via-emerald-600 hover:to-teal-700 text-white text-[16px] sm:text-[17px] font-semibold tracking-wide rounded-2xl shadow-xl shadow-emerald-950/20 border border-emerald-400/30 overflow-hidden transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
               {/* Subtle light sweep animation */}
               <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-btn-shine pointer-events-none" />
@@ -95,6 +102,22 @@ export default function PromoPopup({ onClose }: { onClose: () => void }) {
               </span>
             </button>
           </div>
+
+          {/* Tombol Cek Kelulusan SPMB */}
+          <button
+            onClick={() => {
+              onClose();
+              onOpenHasilSeleksi();
+            }}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-6 sm:px-8 py-3 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 hover:from-blue-950 hover:to-slate-900 text-white text-sm sm:text-base font-semibold rounded-2xl shadow-md shadow-slate-950/15 border border-blue-400/30 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer group"
+          >
+            <div className="w-7 h-7 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 group-hover:bg-blue-600 group-hover:text-white transition-all duration-200 shrink-0">
+              <GraduationCap className="w-4 h-4" />
+            </div>
+            <span className="tracking-wide">Cek Kelulusan SPMB</span>
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/30 font-medium">Gel. 1</span>
+            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white group-hover:translate-x-0.5 transition-all duration-200 ml-0.5 shrink-0" />
+          </button>
         </div>
       </motion.div>
     </div>

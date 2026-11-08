@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import HasilSeleksi from './pages/HasilSeleksi';
 import { useAuth } from './contexts/AuthContext';
 import { collection, query, where, getDocs, doc, onSnapshot } from 'firebase/firestore';
 import { db } from './lib/firebase';
@@ -21,17 +22,21 @@ import {
   LogOut,
   User as UserIcon,
   LayoutDashboard,
-  Shield
+  Shield,
+  ArrowRight
 } from 'lucide-react';
 
 export default function App() {
   const [selectedJenjang, setSelectedJenjang] = useState<string | null>(null);
-  const [view, setView] = useState<'home' | 'login' | 'register' | 'dashboard' | 'admin_dashboard'>(() => {
+  const [view, setView] = useState<'home' | 'login' | 'register' | 'dashboard' | 'admin_dashboard' | 'hasil_seleksi'>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const isAdminRoute = window.location.pathname === '/admin' || urlParams.get('admin') === 'true' || window.location.hash === '#admin';
       if (isAdminRoute) {
         return localStorage.getItem('isAdminLoggedIn') === 'true' ? 'admin_dashboard' : 'login';
+      }
+      if (window.location.hash === '#kelulusan' || window.location.hash === '#hasil-seleksi' || urlParams.get('hasil') === 'true') {
+        return 'hasil_seleksi';
       }
     }
     return 'home';
@@ -166,6 +171,10 @@ export default function App() {
     return <AdminDashboard onLogout={() => navigateTo('home')} onGoHome={() => navigateTo('home')} />;
   }
 
+  if (view === 'hasil_seleksi') {
+    return <HasilSeleksi onBack={() => navigateTo('home')} />;
+  }
+
   // Jika jenjang sudah terpilih
   if (selectedJenjang) {
     return (
@@ -177,7 +186,12 @@ export default function App() {
 
   return (
     <>
-      {showPromoPopup && view === 'home' && <PromoPopup onClose={handleClosePromo} />}
+      {showPromoPopup && view === 'home' && (
+        <PromoPopup 
+          onClose={handleClosePromo} 
+          onOpenHasilSeleksi={() => navigateTo('hasil_seleksi')} 
+        />
+      )}
       <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       {/* HEADER */}
       <header className="bg-white shadow-sm border-b border-gray-100">
@@ -207,7 +221,16 @@ export default function App() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => navigateTo('hasil_seleksi')}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200/80 rounded-xl text-xs sm:text-sm font-semibold transition-all hover:-translate-y-0.5 cursor-pointer shadow-xs"
+              title="Hasil Seleksi Gelombang 1"
+            >
+              <GraduationCap size={16} className="text-blue-700 shrink-0" />
+              <span className="hidden sm:inline">Hasil Seleksi Gel. 1</span>
+              <span className="sm:hidden">Hasil Seleksi</span>
+            </button>
             <PWAInstallButton />
             {currentUser ? (
               <div className="flex items-center gap-2 sm:gap-4">
@@ -252,8 +275,35 @@ export default function App() {
         </div>
       </section>
 
+      {/* PENGUMUMAN HASIL SELEKSI BANNER */}
+      <section className="relative z-20 -mt-12 px-4 max-w-4xl mx-auto mb-6">
+        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl shadow-xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 border border-blue-400/30">
+          <div className="flex items-center gap-3.5 text-center sm:text-left">
+            <div className="w-12 h-12 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 text-blue-300">
+              <GraduationCap size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 justify-center sm:justify-start">
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-500 text-white uppercase tracking-wider">Pengumuman Resmi</span>
+                <span className="text-xs text-blue-200 font-medium">Gelombang Pertama T.A. 2027/2028</span>
+              </div>
+              <h4 className="font-bold text-sm sm:text-base text-white mt-0.5">
+                Hasil Seleksi SPMB Jenjang Wustha (SMP) &amp; Ulya (SMA)
+              </h4>
+            </div>
+          </div>
+          <button
+            onClick={() => navigateTo('hasil_seleksi')}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shrink-0"
+          >
+            <span>Cek Kelulusan</span>
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      </section>
+
       {/* CEK PENDAFTARAN GLOBAL WIDGET */}
-      <section className="relative z-20 -mt-10 px-4 max-w-4xl mx-auto">
+      <section className="relative z-20 px-4 max-w-4xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex-1">
