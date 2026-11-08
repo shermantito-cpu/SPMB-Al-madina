@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ExternalLink, FileText, GraduationCap, Home, Calendar, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ExternalLink, FileText, GraduationCap, Home, Calendar, CheckCircle2, ShieldCheck, Bell, AlertCircle } from 'lucide-react';
 
 interface HasilSeleksiProps {
   onBack: () => void;
@@ -103,14 +103,22 @@ export default function HasilSeleksi({ onBack }: HasilSeleksiProps) {
             </a>
           </div>
 
-          {/* Information Notice */}
-          <div className="w-full mt-6 p-4 rounded-2xl bg-white border border-slate-200/80 text-left flex items-start gap-3 shadow-xs">
-            <ShieldCheck size={20} className="text-emerald-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-slate-600 leading-relaxed">
-              <p className="font-bold text-slate-800 mb-0.5">Informasi Dokumen Resmi</p>
-              <p>
-                File pengumuman berbentuk dokumen resmi PDF yang tersimpan di Google Drive Pondok Pesantren Al-Madina. Anda dapat melihat, mengunduh, dan mencetak surat penetapan kelulusan tersebut secara langsung.
+          {/* Notif Pengingat Informasi Penting */}
+          <div className="w-full mt-6 p-4 sm:p-5 rounded-2xl bg-amber-50/90 border border-amber-200/90 text-left flex items-start gap-3.5 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 text-amber-700 mt-0.5">
+              <Bell size={18} />
+            </div>
+            <div className="text-xs text-slate-700 leading-relaxed space-y-2 flex-1">
+              <p className="font-bold text-amber-900 text-sm">
+                Informasi Penting !
               </p>
+              <p className="text-slate-700 text-xs sm:text-[13px] leading-relaxed">
+                Bapak ibu calon Wali santri dapat melihat, mengunduh, dan mencetak surat penetapan kelulusan tersebut pada hari <strong>Senin, 9 November 2026</strong>
+              </p>
+              <div className="pt-2 border-t border-amber-200/70 text-slate-700 space-y-0.5">
+                <p className="italic font-medium text-amber-900">baarakallahu Fiikum,</p>
+                <p className="font-bold text-slate-800">panitia SPMB Ponpes Al-Madina Prabumulih</p>
+              </div>
             </div>
           </div>
         </div>
